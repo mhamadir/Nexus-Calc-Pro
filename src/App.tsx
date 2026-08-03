@@ -580,6 +580,16 @@ export default function App() {
     setHistory(prev => prev.filter(item => item.id !== id));
   };
 
+  const handleUndoDeleteHistoryItem = (item: HistoryItem, index: number) => {
+    setHistory(prev => {
+      if (prev.some(h => h.id === item.id)) return prev;
+      const next = [...prev];
+      const targetIdx = Math.min(Math.max(0, index), next.length);
+      next.splice(targetIdx, 0, item);
+      return next;
+    });
+  };
+
   const handleClearHistory = () => {
     setHistory([]);
   };
@@ -776,6 +786,7 @@ export default function App() {
             history={history} 
             onClearHistory={handleClearHistory} 
             onDeleteHistoryItem={handleDeleteHistoryItem}
+            onUndoDeleteHistoryItem={handleUndoDeleteHistoryItem}
             isDarkMode={isDarkMode} 
             triggerFeedback={triggerFeedback}
             onRestoreItem={handleRestoreHistoryItem}
