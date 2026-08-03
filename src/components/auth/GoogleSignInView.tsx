@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithPopup, auth, googleProvider } from '../../lib/firebase';
+import { signInWithPopup, auth, googleProvider, db, doc, getDoc, setDoc } from '../../lib/firebase';
 import { ShieldCheck, Calculator, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 import { TurnstileWidget } from './TurnstileWidget';
 import { VpnDetectedAlert } from './VpnDetectedAlert';
@@ -56,7 +56,28 @@ export const GoogleSignInView: React.FC<GoogleSignInViewProps> = ({ isDarkMode =
     }
 
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result && result.user) {
+        const currentUser = result.user;
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        try {
+          const docSnap = await getDoc(userDocRef);
+          if (!docSnap.exists()) {
+            await setDoc(userDocRef, {
+              uid: currentUser.uid,
+              email: currentUser.email || 'No Email',
+              displayName: currentUser.displayName || 'Google User',
+              photoURL: currentUser.photoURL || null,
+              status: 'active',
+              failedDeviceAttempts: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (dbErr) {
+          console.error('Error auto-creating Firestore user document on Google Sign-In:', dbErr);
+        }
+      }
     } catch (err: any) {
       console.error('Sign in error:', err);
       if (err.code === 'auth/popup-closed-by-user') {

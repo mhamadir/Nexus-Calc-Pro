@@ -1,11 +1,11 @@
-const CACHE_NAME = 'nexuscalc-pwa-v2';
+const CACHE_NAME = 'nexuscalc-pwa-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json'
 ];
 
-// 1. Install Event: Cache Core Static Assets
+// 1. Install Event: Cache Core Static Assets & Skip Waiting
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 2. Activate Event: Clean old caches & claim clients
+// 2. Activate Event: Clean old caches, skip waiting & claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -28,27 +28,30 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.skipWaiting();
   self.clients.claim();
 });
 
-// 3. Fetch Event: Cache-First for static assets, Network-Only for backend APIs
+// 3. Fetch Event: Cache-First for static assets, Network-Only for database & Auth APIs
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // EXCLUDE BACKEND API CALLS FROM CACHE (Network-Only Strategy)
-  // Firebase Auth, Firestore, Google APIs, Telegram API endpoints, backend /api/
-  const isBackendApi = 
+  // EXCLUDE BACKEND API CALLS & DATABASE STATE FROM CACHE (Network-Only Strategy)
+  // Strictly bypass cache for Firebase Auth, Firestore, Realtime DB, Google Auth, Telegram API & backend /api/
+  const isBackendApiOrDatabase = 
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('firebaseio.com') ||
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
     url.hostname.includes('securetoken.googleapis.com') ||
-    url.hostname.includes('telegram.org') ||
-    url.hostname.includes('googleapis.com');
+    url.hostname.includes('firebase.googleapis.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('google.com') ||
+    url.hostname.includes('telegram.org');
 
-  if (isBackendApi) {
+  if (isBackendApiOrDatabase) {
     // Network-Only: do not cache, do not serve from cache
     event.respondWith(fetch(event.request));
     return;
@@ -92,4 +95,5 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
 

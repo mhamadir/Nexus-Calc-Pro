@@ -161,8 +161,8 @@ export default function App() {
         const newAttempts = currentAttempts + 1;
         const userDocRef = doc(db, 'users', user.uid);
 
-        if (newAttempts >= 3) {
-          // Automatic 3-attempt multi-device blocking rule triggered
+        if (newAttempts >= 1) {
+          // Maximum security: 1-attempt limit multi-device blocking rule triggered immediately
           updateDoc(userDocRef, {
             status: 'blocked',
             blockedReason: 'multi_device',
@@ -309,7 +309,8 @@ export default function App() {
             email: currentUser.email || 'No Email',
             displayName: currentUser.displayName || 'Google User',
             photoURL: currentUser.photoURL || undefined,
-            status: 'unverified',
+            status: 'active',
+            failedDeviceAttempts: 0,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };

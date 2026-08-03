@@ -88,7 +88,7 @@ export async function sendTelegramSecurityBlockAlert(
   }
 
   const messageText = `
-🚨 <b>SECURITY ALERT: User ${userEmail} auto-blocked after 3 unauthorized device access attempts.</b>
+🚨 <b>SECURITY ALERT: User ${userEmail} auto-blocked after 1 unauthorized device access attempt.</b>
 
 👤 <b>Full Name:</b> ${displayName || 'Google User'}
 📧 <b>Google Email:</b> ${userEmail}

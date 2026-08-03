@@ -50,7 +50,7 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
           </p>
           <p className="text-[11px] text-rose-200/80 leading-relaxed">
             {isMultiDeviceBlock 
-              ? 'Account access was automatically restricted due to 3 unauthorized login attempts from secondary devices. Single-device enforcement is active. Contact administrator (yousifir431@gmail.com) to reset your device fingerprint.'
+              ? 'Account access was automatically restricted due to an unauthorized login attempt from a secondary device (1-attempt maximum limit). Single-device enforcement is active. Contact administrator (yousifir431@gmail.com) to reset your device fingerprint.'
               : 'Your transaction submission was rejected or access has been administrative restricted. Please contact support if you believe this is a mistake.'}
           </p>
         </div>
