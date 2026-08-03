@@ -235,6 +235,25 @@ export default function StandardTab({
             max-height: 100% !important;
           }
         }
+        #standard-keyboard-container {
+          flex: 1 1 0% !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        #sci-grid {
+          flex: 1 1 0% !important;
+          min-height: 0 !important;
+        }
+        #basic-grid {
+          flex: 1.4 1 0% !important;
+          min-height: 0 !important;
+        }
+        #sci-grid button, #basic-grid button {
+          min-height: 0 !important;
+          height: 100% !important;
+        }
         @media (max-height: 500px) {
           #standard-tab-root {
             display: flex !important;
@@ -319,7 +338,7 @@ export default function StandardTab({
       {/* Top Digital Display Panel - Stretches dynamically to absorb empty space */}
       <div 
         id="standard-display-panel" 
-        className={`flex-1 min-h-[90px] max-h-[135px] flex flex-col justify-between p-2.5 transition-all mb-1 shrink-0 ${
+        className={`flex-none min-h-[80px] max-h-[120px] flex flex-col justify-between p-2 transition-all mb-1 shrink-0 ${
           isDarkMode 
             ? 'bg-transparent border-transparent shadow-none text-neutral-100' 
             : 'bg-transparent border-transparent shadow-none text-slate-900'
@@ -360,7 +379,7 @@ export default function StandardTab({
         </div>
 
         {/* Expression History */}
-        <div className="text-right h-5 text-sm font-mono overflow-hidden opacity-60 text-ellipsis whitespace-nowrap">
+        <div className="text-right h-4 text-xs font-mono overflow-hidden opacity-60 text-ellipsis whitespace-nowrap">
           {historyExpression || ' '}
         </div>
 
@@ -376,7 +395,7 @@ export default function StandardTab({
           {/* Real-time Dynamic result preview */}
           <div 
             id="live-result-preview" 
-            className="text-right h-8 font-mono font-bold text-lg md:text-xl text-green-500 dark:text-green-400 mt-1 min-h-[2rem] flex items-center justify-end"
+            className="text-right h-6 font-mono font-bold text-base md:text-lg text-green-500 dark:text-green-400 mt-0.5 min-h-[1.5rem] flex items-center justify-end"
           >
             {liveResult ? `= ${liveResult}` : (parsingError && expression ? <span className="text-neutral-500/80 text-xs italic">{parsingError}</span> : '')}
           </div>
@@ -384,11 +403,11 @@ export default function StandardTab({
       </div>
 
       {/* Master Keyboard Container */}
-      <div id="standard-keyboard-container" className="flex flex-col gap-1.5 flex-[3] min-h-0 w-full overflow-hidden landscape:grid landscape:grid-cols-2 landscape:gap-2.5 landscape:h-auto landscape:flex-1">
+      <div id="standard-keyboard-container" className="flex flex-col gap-1 flex-1 min-h-0 w-full overflow-hidden landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:h-auto landscape:flex-1">
         {/* 40% Middle Scientific Function Grid */}
         <div 
           id="sci-grid" 
-          className="grid grid-cols-6 grid-rows-4 gap-1.5 w-full flex-1 min-h-0"
+          className="grid grid-cols-6 grid-rows-4 gap-1 w-full flex-1 min-h-0"
         >
           {sciButtons.map(({ label, val }) => (
             <button
@@ -396,7 +415,7 @@ export default function StandardTab({
               id={`btn-sci-${label.replace(/⁻¹/g, '-inv').replace(/\|/g, '').replace(/\^/g, 'pow')}`}
               onClick={() => handlePress(val)}
               type="button"
-              className={`flex items-center justify-center w-full h-full text-[11px] sm:text-xs font-normal rounded-2xl transition-all duration-150 active:scale-95 ${
+              className={`flex items-center justify-center w-full h-full text-[10px] sm:text-xs font-normal rounded-xl transition-all duration-150 active:scale-95 ${
                 isDarkMode
                   ? 'bg-[#1c1c1e] hover:bg-[#2c2c2e] text-zinc-100 active:bg-neutral-800'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-800 active:bg-slate-300'
@@ -410,7 +429,7 @@ export default function StandardTab({
         {/* 35% Bottom Basic Number Pad */}
         <div 
           id="basic-grid" 
-          className="grid grid-cols-4 grid-rows-5 gap-2 w-full flex-[1.4] min-h-0"
+          className="grid grid-cols-4 grid-rows-5 gap-1 w-full flex-[1.4] min-h-0"
         >
           {/* Row 1 */}
           <button

@@ -6,6 +6,20 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+html, body, #root {
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100vw;
+  max-width: 100vw;
+  overflow: hidden !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  touch-action: manipulation;
+}
+
 /* Custom micro-scrollbar resetting to keep mobile screens absolutely clean from bloated bars */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
@@ -14,3 +28,4 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
