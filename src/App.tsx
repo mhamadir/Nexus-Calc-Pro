@@ -22,6 +22,7 @@ import { BlockedView } from './components/auth/BlockedView';
 import { OwnerDashboardView } from './components/admin/OwnerDashboardView';
 import { playMechanicalClick, triggerHaptic } from './utils/feedback';
 import { sendTelegramSecurityBlockAlert } from './utils/telegram';
+import { getLocalDeviceId } from './utils/device';
 import { 
   auth, 
   db, 
@@ -118,21 +119,6 @@ export default function App() {
     };
   }, []);
 
-  // Device fingerprint helper
-  const getLocalDeviceId = (): string => {
-    try {
-      let devId = localStorage.getItem('nexus_device_fingerprint');
-      if (!devId) {
-        devId = 'dev_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
-        localStorage.setItem('nexus_device_fingerprint', devId);
-      }
-      return devId;
-    } catch (_) {
-      return 'dev_fallback';
-    }
-  };
-
-
   // Single-Device Locking & Automated Multi-Device Blocking Rule
   useEffect(() => {
     if (!user || !userProfile) return;
@@ -140,7 +126,7 @@ export default function App() {
 
     const currentDeviceId = getLocalDeviceId();
 
-    // 1. Initial binding if account has no registered activeDeviceId in Firestore
+    // 1. Initial binding if account has no registered activeDeviceId in Firestore (first time login or post-reset)
     if (!userProfile.activeDeviceId) {
       const userDocRef = doc(db, 'users', user.uid);
       updateDoc(userDocRef, {
@@ -157,34 +143,24 @@ export default function App() {
       if (!sessionStorage.getItem(sessionAttemptKey)) {
         sessionStorage.setItem(sessionAttemptKey, 'true');
 
-        const currentAttempts = userProfile.failedDeviceAttempts || 0;
-        const newAttempts = currentAttempts + 1;
         const userDocRef = doc(db, 'users', user.uid);
 
-        if (newAttempts >= 1) {
-          // Maximum security: 1-attempt limit multi-device blocking rule triggered immediately
-          updateDoc(userDocRef, {
-            status: 'blocked',
-            blockedReason: 'multi_device',
-            failedDeviceAttempts: newAttempts,
-            lastAttemptDeviceId: currentDeviceId,
-            updatedAt: new Date().toISOString()
-          }).then(() => {
-            // Trigger Automated Payload Alert to Telegram Bot
-            sendTelegramSecurityBlockAlert(
-              telegramConfig,
-              user.email || 'No email',
-              userProfile.displayName || user.displayName || 'Google User',
-              user.uid
-            ).catch((err) => console.error('Error sending auto-block Telegram security alert:', err));
-          }).catch((err) => console.error('Error auto-blocking user for multi-device login:', err));
-        } else {
-          updateDoc(userDocRef, {
-            failedDeviceAttempts: newAttempts,
-            lastAttemptDeviceId: currentDeviceId,
-            updatedAt: new Date().toISOString()
-          }).catch((err) => console.error('Error updating multi-device attempt counter:', err));
-        }
+        // Instantly lock out: set status to blocked, failedDeviceAttempts to 1, blockedReason to multi_device
+        updateDoc(userDocRef, {
+          status: 'blocked',
+          blockedReason: 'multi_device',
+          failedDeviceAttempts: 1,
+          lastAttemptDeviceId: currentDeviceId,
+          updatedAt: new Date().toISOString()
+        }).then(() => {
+          // Trigger Automated Payload Alert to Telegram Bot
+          sendTelegramSecurityBlockAlert(
+            telegramConfig,
+            user.email || 'No email',
+            userProfile.displayName || user.displayName || 'Google User',
+            user.uid
+          ).catch((err) => console.error('Error sending auto-block Telegram security alert:', err));
+        }).catch((err) => console.error('Error auto-blocking user for multi-device login:', err));
       }
     }
   }, [user, userProfile]);

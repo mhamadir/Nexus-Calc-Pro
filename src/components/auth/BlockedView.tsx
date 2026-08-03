@@ -14,7 +14,7 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
     signOut(auth);
   };
 
-  const isMultiDeviceBlock = profile?.blockedReason === 'multi_device';
+  const isMultiDeviceBlock = profile?.blockedReason === 'multi_device' || (profile?.failedDeviceAttempts || 0) >= 1;
 
   return (
     <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 transition-colors select-none ${
@@ -35,7 +35,7 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
 
         {/* Title */}
         <h2 className="text-xl font-black tracking-tight mb-2 text-rose-500">
-          {isMultiDeviceBlock ? 'Multi-Device Access Blocked' : 'Access Restricted'}
+          {isMultiDeviceBlock ? 'Account Suspended' : 'Access Restricted'}
         </h2>
         
         <p className="text-xs text-neutral-400 mb-6 font-medium">
@@ -48,10 +48,10 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
             <ShieldAlert size={14} className="shrink-0" />
             <span>{isMultiDeviceBlock ? 'Security Rule Triggered' : 'Your access has been blocked.'}</span>
           </p>
-          <p className="text-[11px] text-rose-200/80 leading-relaxed">
+          <p className="text-[11px] text-rose-200/80 leading-relaxed font-semibold">
             {isMultiDeviceBlock 
-              ? 'Account access was automatically restricted due to an unauthorized login attempt from a secondary device (1-attempt maximum limit). Single-device enforcement is active. Contact administrator (yousifir431@gmail.com) to reset your device fingerprint.'
-              : 'Your transaction submission was rejected or access has been administrative restricted. Please contact support if you believe this is a mistake.'}
+              ? 'Access Blocked: Concurrent multi-device login detected. Your account has been suspended for security.'
+              : 'Your transaction submission was rejected or access has been administratively restricted. Please contact support if you believe this is a mistake.'}
           </p>
         </div>
 

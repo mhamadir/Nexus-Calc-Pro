@@ -61,6 +61,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
 
   // Unblock user & reset single-device fingerprint binding + attempt counter
   const handleUnblockAndResetDevice = async (targetUid: string) => {
+    if (!isAdmin) return;
     try {
       const userRef = doc(db, 'users', targetUid);
       await updateDoc(userRef, {
@@ -395,7 +396,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
             }`}
           >
             <Smartphone size={16} />
-            <span>Blocked Accounts ({usersList.filter(u => u.status === 'blocked').length})</span>
+            <span>Blocked Accounts ({usersList.filter(u => u.status === 'blocked' || (u.failedDeviceAttempts || 0) >= 1).length})</span>
           </button>
 
           <button
@@ -534,7 +535,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
                             {/* Actions */}
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end space-x-1.5">
-                                {u.status === 'blocked' ? (
+                                {(u.status === 'blocked' || (u.failedDeviceAttempts || 0) >= 1) ? (
                                   <button
                                     id={`btn-unblock-reset-device-${u.uid}`}
                                     type="button"
@@ -543,7 +544,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
                                     title="Unblock User & Reset Registered Device"
                                   >
                                     <RefreshCw size={12} />
-                                    <span>Unblock & Reset Device</span>
+                                    <span>Unblock User</span>
                                   </button>
                                 ) : (
                                   <>
@@ -603,7 +604,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
             <div className={`rounded-2xl border overflow-hidden shadow-xl ${
               isDarkMode ? 'bg-neutral-900/90 border-neutral-800' : 'bg-white border-slate-200'
             }`}>
-              {usersList.filter(u => u.status === 'blocked').length === 0 ? (
+              {usersList.filter(u => u.status === 'blocked' || (u.failedDeviceAttempts || 0) >= 1).length === 0 ? (
                 <div className="p-12 text-center text-xs text-neutral-400">
                   No blocked accounts currently registered.
                 </div>
@@ -622,7 +623,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-800/60">
-                      {usersList.filter(u => u.status === 'blocked').map((u) => (
+                      {usersList.filter(u => u.status === 'blocked' || (u.failedDeviceAttempts || 0) >= 1).map((u) => (
                         <tr key={u.uid} className="hover:bg-neutral-800/30 transition-colors">
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-white">{u.displayName || 'No Name'}</div>
