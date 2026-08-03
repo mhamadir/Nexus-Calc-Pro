@@ -34,7 +34,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onExpire,
   onError,
   isDarkMode = true,
-  siteKey = '1x00000000000000000000AA' // Official Cloudflare Turnstile testing sitekey (Always Passes)
+  siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',// Official Cloudflare Turnstile testing sitekey (Always Passes)
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
