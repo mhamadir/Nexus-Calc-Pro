@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isOwner() {
+      return request.auth != null && request.auth.token.email == 'yousifir431@gmail.com';
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isOwner());
+      allow list: if isOwner();
+    }
+
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+  }
+}

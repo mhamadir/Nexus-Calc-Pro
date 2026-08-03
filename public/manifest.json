@@ -1,0 +1,22 @@
+{
+  "short_name": "NexusCalc",
+  "name": "Engineering Calculator Pro",
+  "description": "Offline-capable mobile general and structural engineering calculator.",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/000000/calculator.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/000000/calculator.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "display": "standalone",
+  "orientation": "portrait"
+}

@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "User accounts and payment verification status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "status": { "type": "string", "enum": ["unverified", "pending", "active", "blocked"] },
+        "paymentDetails": {
+          "type": "object",
+          "properties": {
+            "fullName": { "type": "string" },
+            "transactionId": { "type": "string" },
+            "paymentMethod": { "type": "string" },
+            "dateTime": { "type": "string" },
+            "submittedAt": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "status"]
+    },
+    "config": {
+      "title": "App Configuration",
+      "description": "Telegram Bot Token and Chat ID settings",
+      "type": "object",
+      "properties": {
+        "botToken": { "type": "string" },
+        "chatId": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  }
+}
