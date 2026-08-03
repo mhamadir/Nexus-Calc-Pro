@@ -415,19 +415,32 @@ export default function App() {
   const [isHapticEnabled, setIsHapticEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('nexus_is_haptic_enabled');
-      return saved ? JSON.parse(saved) : true;
+      return saved !== null ? JSON.parse(saved) : true;
     } catch (_) {
       return true;
     }
   });
+
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('nexus_is_audio_enabled');
-      return saved ? JSON.parse(saved) : true;
+      return saved !== null ? JSON.parse(saved) : true;
     } catch (_) {
       return true;
     }
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_is_haptic_enabled', JSON.stringify(isHapticEnabled));
+    } catch (_) {}
+  }, [isHapticEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_is_audio_enabled', JSON.stringify(isAudioEnabled));
+    } catch (_) {}
+  }, [isAudioEnabled]);
   const [isZoomLocked, setIsZoomLocked] = useState<boolean>(false);
 
   // Standard Tab State
@@ -542,7 +555,11 @@ export default function App() {
 
   const triggerFeedback = () => {
     if (isAudioEnabled) playMechanicalClick();
-    if (isHapticEnabled) triggerHaptic();
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator && isHapticEnabled) {
+      try {
+        navigator.vibrate(15);
+      } catch (e) {}
+    }
   };
 
   const handleTabClick = (tab: TabType) => {
@@ -851,7 +868,7 @@ export default function App() {
 
   // State: Active -> Render Full Unlocked PWA Engineering Calculator App!
   return (
-    <div className={`min-h-screen w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans ${
+    <div className={`min-h-screen h-[100dvh] max-h-[100dvh] w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans overflow-hidden overflow-y-hidden ${
       isDarkMode ? 'bg-zinc-950 text-neutral-100' : 'bg-slate-50 text-slate-800'
     }`}>
       
@@ -862,7 +879,7 @@ export default function App() {
       {/* Primary Phone Container */}
       <div 
         id="phone-frame-container" 
-        className={`w-full h-screen md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden shadow-2xl relative border transition-all duration-250 md:aspect-[9/18a] ${
+        className={`w-full h-screen h-[100dvh] max-h-[100dvh] md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden overflow-y-hidden shadow-2xl relative border transition-all duration-250 md:aspect-[9/18a] ${
           isDarkMode 
             ? 'bg-zinc-950 border-neutral-800/80 shadow-black' 
             : 'bg-white border-slate-200 shadow-slate-300'
@@ -883,7 +900,7 @@ export default function App() {
         )}
 
         {/* Inner Viewport Screen */}
-        <div className="flex-1 w-full max-w-full overflow-x-hidden p-0 md:p-3.5 pb-1 flex flex-col justify-between">
+        <div className="flex-1 w-full max-w-full overflow-hidden overflow-y-hidden min-h-0 p-0 md:p-3.5 pb-0 flex flex-col justify-between">
           {renderActiveScreen()}
         </div>
 

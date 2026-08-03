@@ -95,7 +95,15 @@ export default function SettingsTab({
                 {/* Toggle switch */}
                 <button
                   id="toggle-haptic-feedback"
-                  onClick={onToggleHaptic}
+                  onClick={() => {
+                    const nextState = !isHapticEnabled;
+                    onToggleHaptic();
+                    if (nextState && typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                      try {
+                        navigator.vibrate([30, 50, 30]);
+                      } catch (e) {}
+                    }
+                  }}
                   className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-200 outline-none cursor-pointer ${
                     isHapticEnabled ? 'bg-emerald-500' : 'bg-neutral-500/30'
                   }`}

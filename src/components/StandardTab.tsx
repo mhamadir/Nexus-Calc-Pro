@@ -207,8 +207,14 @@ export default function StandardTab({
   ];
 
   return (
-    <div id="standard-tab-root" className="flex flex-col h-full w-full justify-between pb-4 overflow-hidden select-none p-1">
+    <div id="standard-tab-root" className="flex flex-col h-full max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1 pb-0.5 box-border">
       <style>{`
+        #standard-tab-root {
+          height: 100% !important;
+          max-height: 100% !important;
+          overflow: hidden !important;
+          overflow-y: hidden !important;
+        }
         @media (max-height: 500px) {
           #standard-tab-root {
             display: flex !important;
@@ -219,8 +225,8 @@ export default function StandardTab({
             padding-bottom: 0px !important;
           }
           #standard-display-panel {
-            min-height: 72px !important;
-            max-height: 96px !important;
+            min-height: 60px !important;
+            max-height: 85px !important;
             padding: 0.25rem 0.5rem !important;
             margin-bottom: 0px !important;
             flex: none !important;
@@ -237,13 +243,13 @@ export default function StandardTab({
             line-height: 1.25 !important;
           }
           #formula-expression {
-            font-size: 1.4rem !important;
+            font-size: 1.3rem !important;
             margin-top: 0px !important;
           }
           #live-result-preview {
-            height: 18px !important;
-            min-height: 18px !important;
-            font-size: 0.95rem !important;
+            height: 16px !important;
+            min-height: 16px !important;
+            font-size: 0.85rem !important;
             margin-top: 2px !important;
           }
           #standard-keyboard-container {
@@ -293,7 +299,7 @@ export default function StandardTab({
       {/* Top Digital Display Panel - Stretches dynamically to absorb empty space */}
       <div 
         id="standard-display-panel" 
-        className={`flex-1 min-h-[120px] max-h-[160px] flex flex-col justify-between p-3 transition-all mb-1 ${
+        className={`flex-1 min-h-[90px] max-h-[135px] flex flex-col justify-between p-2.5 transition-all mb-1 shrink-0 ${
           isDarkMode 
             ? 'bg-transparent border-transparent shadow-none text-neutral-100' 
             : 'bg-transparent border-transparent shadow-none text-slate-900'
@@ -350,7 +356,7 @@ export default function StandardTab({
           {/* Real-time Dynamic result preview */}
           <div 
             id="live-result-preview" 
-            className="text-right h-8 font-mono font-bold text-lg md:text-xl text-green-500 dark:text-green-400 mt-2 min-h-[2rem] flex items-center justify-end"
+            className="text-right h-8 font-mono font-bold text-lg md:text-xl text-green-500 dark:text-green-400 mt-1 min-h-[2rem] flex items-center justify-end"
           >
             {liveResult ? `= ${liveResult}` : (parsingError && expression ? <span className="text-neutral-500/80 text-xs italic">{parsingError}</span> : '')}
           </div>
@@ -358,7 +364,7 @@ export default function StandardTab({
       </div>
 
       {/* Master Keyboard Container */}
-      <div id="standard-keyboard-container" className="flex flex-col gap-2 h-[72%] shrink-0 landscape:grid landscape:grid-cols-2 landscape:gap-2.5 landscape:h-auto landscape:flex-1">
+      <div id="standard-keyboard-container" className="flex flex-col gap-1.5 flex-[3] min-h-0 w-full overflow-hidden landscape:grid landscape:grid-cols-2 landscape:gap-2.5 landscape:h-auto landscape:flex-1">
         {/* 40% Middle Scientific Function Grid */}
         <div 
           id="sci-grid" 

@@ -58,12 +58,12 @@ export function playMechanicalClick() {
   }
 }
 
-export function triggerHaptic() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+export function triggerHaptic(duration: number | number[] = 15) {
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
-      navigator.vibrate(12);
+      navigator.vibrate(duration);
     } catch (e) {
-      // Ignore vibration error under guest sandboxing
+      // Local device execution under guest browser sandboxing
     }
   }
 }
