@@ -68,7 +68,7 @@ export const GoogleSignInView: React.FC<GoogleSignInViewProps> = ({ isDarkMode =
               email: currentUser.email || 'No Email',
               displayName: currentUser.displayName || 'Google User',
               photoURL: currentUser.photoURL || null,
-              status: 'active',
+              status: 'pending',
               failedDeviceAttempts: 0,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
@@ -157,6 +157,7 @@ export const GoogleSignInView: React.FC<GoogleSignInViewProps> = ({ isDarkMode =
         {/* Cloudflare Turnstile Bot Protection Widget */}
         <div className="mb-5">
           <TurnstileWidget
+            siteKey="0x4AAAAAAEFBVy5u71mRncqd"
             onVerify={() => {
               setTurnstileVerified(true);
               setError(null);

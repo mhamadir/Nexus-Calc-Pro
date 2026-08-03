@@ -309,7 +309,7 @@ export default function App() {
             email: currentUser.email || 'No Email',
             displayName: currentUser.displayName || 'Google User',
             photoURL: currentUser.photoURL || undefined,
-            status: 'active',
+            status: 'pending',
             failedDeviceAttempts: 0,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -345,6 +345,20 @@ export default function App() {
             // Clear cached authorization state if user is blocked or unverified
             localStorage.removeItem(OFFLINE_AUTH_KEY);
           }
+        } else {
+          // Missing user document fallback: initialize default user profile cleanly without crashing
+          const fallbackProfile: UserProfile = {
+            uid: currentUser.uid,
+            email: currentUser.email || 'No Email',
+            displayName: currentUser.displayName || 'Google User',
+            photoURL: currentUser.photoURL || undefined,
+            status: 'pending',
+            failedDeviceAttempts: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          setUserProfile(fallbackProfile);
+          setDoc(userDocRef, fallbackProfile).catch((e) => console.error('Error initializing fallback profile doc:', e));
         }
         setAuthLoading(false);
       }, (err) => {
@@ -847,11 +861,28 @@ export default function App() {
     );
   }
 
-  // 4. Verification Status Check for Authenticated Users
-  const userStatus = userProfile?.status || 'unverified';
+  // 4. Verification & Security Status Gate for Authenticated Users
+  const userStatus = userProfile?.status || 'pending';
+  const failedAttempts = userProfile?.failedDeviceAttempts || 0;
 
-  // State: Unverified -> Render Payment Details Submission Form
-  if (userStatus === 'unverified') {
+  // State: Blocked or device attempt limit reached (failedDeviceAttempts >= 1) -> Lock account & render Blocked View
+  if (userStatus === 'blocked' || failedAttempts >= 1) {
+    return <BlockedView user={user} profile={userProfile} isDarkMode={isDarkMode} />;
+  }
+
+  // State: Non-active User (pending, unpaid, unverified, expired) -> Enforce Payment Gate
+  if (userStatus !== 'active') {
+    // If pending and payment details were already submitted, render Pending Verification View
+    if (userStatus === 'pending' && userProfile?.paymentDetails) {
+      return (
+        <PendingVerificationView 
+          user={user} 
+          profile={userProfile} 
+          isDarkMode={isDarkMode} 
+        />
+      );
+    }
+    // Otherwise redirect directly to Payment / Checkout Page
     return (
       <TransactionSubmissionView 
         user={user} 
@@ -859,22 +890,6 @@ export default function App() {
         isDarkMode={isDarkMode} 
       />
     );
-  }
-
-  // State: Pending -> Render Locked Waiting Verification Screen
-  if (userStatus === 'pending') {
-    return (
-      <PendingVerificationView 
-        user={user} 
-        profile={userProfile} 
-        isDarkMode={isDarkMode} 
-      />
-    );
-  }
-
-  // State: Blocked -> Render Access Restricted Screen
-  if (userStatus === 'blocked') {
-    return <BlockedView user={user} profile={userProfile} isDarkMode={isDarkMode} />;
   }
 
   // State: Active -> Render Full Unlocked PWA Engineering Calculator App!
