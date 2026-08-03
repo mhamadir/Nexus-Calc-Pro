@@ -5,16 +5,30 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
-const serverApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const serverDb = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(serverApp, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(serverApp);
+let serverDbInstance: any = null;
+
+function getServerDb() {
+  if (!serverDbInstance) {
+    try {
+      const serverApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+      serverDbInstance = firebaseConfig.firestoreDatabaseId 
+        ? getFirestore(serverApp, firebaseConfig.firestoreDatabaseId)
+        : getFirestore(serverApp);
+    } catch (err) {
+      console.error('[Firestore] Error initializing Firestore client:', err);
+      return null;
+    }
+  }
+  return serverDbInstance;
+}
 
 const botTokenCache = new Map<string, string>();
 
 async function unblockUserInFirestore(uid: string) {
   try {
-    const userRef = doc(serverDb, 'users', uid);
+    const db = getServerDb();
+    if (!db) return false;
+    const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       status: 'active',
       activeDeviceId: null,
@@ -33,7 +47,9 @@ async function unblockUserInFirestore(uid: string) {
 
 async function blockUserInFirestore(uid: string) {
   try {
-    const userRef = doc(serverDb, 'users', uid);
+    const db = getServerDb();
+    if (!db) return false;
+    const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       status: 'blocked',
       blockedReason: 'manual',
@@ -48,7 +64,9 @@ async function blockUserInFirestore(uid: string) {
 
 async function approveUserInFirestore(uid: string) {
   try {
-    const userRef = doc(serverDb, 'users', uid);
+    const db = getServerDb();
+    if (!db) return false;
+    const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       status: 'active',
       activeDeviceId: null,
