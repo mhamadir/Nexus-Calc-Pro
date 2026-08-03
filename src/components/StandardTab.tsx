@@ -207,13 +207,33 @@ export default function StandardTab({
   ];
 
   return (
-    <div id="standard-tab-root" className="flex flex-col h-full max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1 pb-0.5 box-border">
+    <div 
+      id="standard-tab-root" 
+      className="flex flex-col h-[100dvh] max-h-[100dvh] md:h-full md:max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1 pb-0.5 box-border"
+      style={{
+        height: '100dvh',
+        maxHeight: '100dvh',
+        overflow: 'hidden',
+        overflowY: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       <style>{`
         #standard-tab-root {
-          height: 100% !important;
-          max-height: 100% !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
           overflow: hidden !important;
           overflow-y: hidden !important;
+          display: flex !important;
+          flex-direction: column !important;
+          box-sizing: border-box !important;
+        }
+        @media (min-width: 768px) {
+          #standard-tab-root {
+            height: 100% !important;
+            max-height: 100% !important;
+          }
         }
         @media (max-height: 500px) {
           #standard-tab-root {
