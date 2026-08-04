@@ -216,10 +216,11 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   if (!isAdmin) {
     return (
       <div 
-        className={`min-h-screen max-h-screen h-screen w-full flex items-center justify-center p-4 select-none overflow-y-auto ${
+        id="owner-denied-view"
+        className={`w-full flex items-center justify-center p-4 select-none overflow-y-auto ${
           isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
         }`}
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ height: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
       >
         <div className="w-full max-w-md p-8 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-center">
           <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
@@ -243,10 +244,11 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   if (!isOtpVerified) {
     return (
       <div 
-        className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 select-none overflow-y-auto ${
+        id="owner-otp-view"
+        className={`w-full flex flex-col items-center justify-start md:justify-center p-4 select-none overflow-y-auto ${
           isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
         }`}
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ height: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
       >
         <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md transition-all ${
           isDarkMode 
@@ -329,10 +331,11 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
 
   return (
     <div 
-      className={`min-h-screen max-h-screen h-screen w-full flex flex-col select-none overflow-y-auto ${
+      id="owner-dashboard-view"
+      className={`w-full flex flex-col select-none overflow-y-auto ${
         isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
       }`}
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      style={{ height: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
     >
       
       {/* Top Admin Header */}

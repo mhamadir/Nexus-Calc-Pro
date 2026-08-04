@@ -18,10 +18,11 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
 
   return (
     <div 
-      className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 transition-colors select-none overflow-y-auto ${
+      id="blocked-view"
+      className={`w-full flex flex-col items-center justify-start md:justify-center p-4 transition-colors select-none overflow-y-auto ${
         isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
       }`}
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      style={{ height: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
     >
       <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md text-center transition-all ${
         isDarkMode 

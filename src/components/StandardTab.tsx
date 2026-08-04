@@ -208,7 +208,7 @@ export default function StandardTab({
 
   return (
     <div 
-      id="standard-tab-root" 
+      id="standard-tab-view" 
       className="flex flex-col h-[100dvh] max-h-[100dvh] md:h-full md:max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1 pb-0.5 box-border"
       style={{
         height: '100dvh',
@@ -220,7 +220,7 @@ export default function StandardTab({
       }}
     >
       <style>{`
-        #standard-tab-root {
+        #standard-tab-view {
           height: 100dvh !important;
           max-height: 100dvh !important;
           overflow: hidden !important;
@@ -230,7 +230,7 @@ export default function StandardTab({
           box-sizing: border-box !important;
         }
         @media (min-width: 768px) {
-          #standard-tab-root {
+          #standard-tab-view {
             height: 100% !important;
             max-height: 100% !important;
           }
