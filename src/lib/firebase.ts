@@ -18,7 +18,8 @@ import {
   collection, 
   query, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  deleteField
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -46,6 +47,7 @@ export {
   collection, 
   query, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  deleteField
 };
 export type { User };

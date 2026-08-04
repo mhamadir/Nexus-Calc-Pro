@@ -408,6 +408,13 @@ export default function App() {
             // Active paid user on verified device
             localStorage.setItem('userStatus', 'active');
             setUserProfile(profileData);
+            if (!profileData.activeDeviceId) {
+              updateDoc(userDocRef, {
+                activeDeviceId: currentDeviceId,
+                registeredDeviceId: currentDeviceId,
+                updatedAt: new Date().toISOString()
+              }).catch((err) => console.error('Error auto-registering device for unblocked user:', err));
+            }
           }
         }
       } catch (err) {
@@ -471,6 +478,13 @@ export default function App() {
           } else {
             localStorage.setItem('userStatus', 'active');
             setUserProfile(profileData);
+            if (!profileData.activeDeviceId) {
+              updateDoc(userDocRef, {
+                activeDeviceId: currentDeviceId,
+                registeredDeviceId: currentDeviceId,
+                updatedAt: new Date().toISOString()
+              }).catch((e) => console.error('Error auto-registering device in snapshot:', e));
+            }
 
             const offlinePayload = {
               uid: currentUser.uid,

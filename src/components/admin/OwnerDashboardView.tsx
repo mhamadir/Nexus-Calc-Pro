@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, db, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, signOut, auth } from '../../lib/firebase';
+import { User, db, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, signOut, auth, deleteField, serverTimestamp } from '../../lib/firebase';
 import { UserProfile, UserStatus, TelegramConfig } from '../../types';
 import { sendTelegramPaymentNotification } from '../../utils/telegram';
 import { 
@@ -56,24 +56,64 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   const [configMessage, setConfigMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testingTelegram, setTestingTelegram] = useState(false);
 
+  // Action Toast/Banner Feedback State
+  const [unblockFeedback, setUnblockFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   // Default Master OTP Code for administrator protocol
   const MASTER_OTP = '984210';
 
   // Unblock user & reset single-device fingerprint binding + attempt counter
   const handleUnblockAndResetDevice = async (targetUid: string) => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+      alert('Unauthorized: Only administrators can unblock users.');
+      return;
+    }
+
+    // 1. Immediate Optimistic UI State Update to ACTIVE in real time
+    setUsersList((prevUsers) =>
+      prevUsers.map((u) => {
+        if (u.uid === targetUid) {
+          return {
+            ...u,
+            status: 'active',
+            failedDeviceAttempts: 0,
+            activeDeviceId: undefined,
+            registeredDeviceId: undefined,
+            lastAttemptDeviceId: undefined,
+            blockedReason: undefined,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return u;
+      })
+    );
+
+    setUnblockFeedback(null);
+
+    // 2. Perform Complete Account & Device Reset in Firestore
     try {
       const userRef = doc(db, 'users', targetUid);
       await updateDoc(userRef, {
         status: 'active',
-        activeDeviceId: null,
         failedDeviceAttempts: 0,
-        lastAttemptDeviceId: null,
-        blockedReason: null,
+        activeDeviceId: deleteField(),
+        registeredDeviceId: deleteField(),
+        lastAttemptDeviceId: deleteField(),
+        blockedReason: deleteField(),
+        unblockedAt: serverTimestamp(),
         updatedAt: new Date().toISOString()
       });
-    } catch (err) {
+
+      // 3. UI Toast / Feedback Notification
+      setUnblockFeedback({ type: 'success', text: 'User unblocked successfully' });
+      setTimeout(() => {
+        setUnblockFeedback((prev) => (prev?.text === 'User unblocked successfully' ? null : prev));
+      }, 4000);
+    } catch (err: any) {
       console.error(`Error unblocking & resetting device for user ${targetUid}:`, err);
+      const failureReason = err?.message || 'Permission or network error occurred while updating Firestore.';
+      setUnblockFeedback({ type: 'error', text: `Failed to unblock user: ${failureReason}` });
+      alert(`Unblock Failed: ${failureReason}`);
     }
   };
 
@@ -383,6 +423,20 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
       {/* Main Container */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         
+        {unblockFeedback && (
+          <div className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between transition-all ${
+            unblockFeedback.type === 'success'
+              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+              : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+          }`}>
+            <div className="flex items-center gap-2">
+              {unblockFeedback.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+              <span>{unblockFeedback.text}</span>
+            </div>
+            <button onClick={() => setUnblockFeedback(null)} className="text-current opacity-70 hover:opacity-100 font-bold px-2 py-0.5 rounded">✕</button>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 border-b border-neutral-800 pb-2">
           <button
