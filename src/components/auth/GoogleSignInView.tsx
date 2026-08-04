@@ -95,9 +95,12 @@ export const GoogleSignInView: React.FC<GoogleSignInViewProps> = ({ isDarkMode =
   // If active VPN detected, present anti-VPN wall
   if (vpnResult?.isVpn) {
     return (
-      <div className={`min-h-screen w-full flex items-center justify-center p-4 transition-colors ${
-        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-      }`}>
+      <div 
+        className={`min-h-screen max-h-screen h-screen w-full flex items-center justify-center p-4 transition-colors overflow-y-auto ${
+          isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+        }`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         <VpnDetectedAlert
           onRecheck={() => runVpnCheck(true)}
           isDarkMode={isDarkMode}
@@ -109,11 +112,14 @@ export const GoogleSignInView: React.FC<GoogleSignInViewProps> = ({ isDarkMode =
   }
 
   return (
-    <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 transition-colors select-none ${
-      isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-    }`}>
+    <div 
+      className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 transition-colors select-none overflow-y-auto ${
+        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+      }`}
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       {/* Container card */}
-      <div className={`w-full max-w-md rounded-3xl p-8 border shadow-2xl backdrop-blur-md transition-all ${
+      <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md transition-all ${
         isDarkMode 
           ? 'bg-neutral-900/90 border-neutral-800/80 shadow-black/60' 
           : 'bg-white border-slate-200/80 shadow-slate-300/40'

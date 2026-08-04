@@ -21,10 +21,13 @@ export const PendingVerificationView: React.FC<PendingVerificationViewProps> = (
   const payment = profile?.paymentDetails;
 
   return (
-    <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 transition-colors select-none ${
-      isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-    }`}>
-      <div className={`w-full max-w-md rounded-3xl p-8 border shadow-2xl backdrop-blur-md text-center transition-all ${
+    <div 
+      className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 transition-colors select-none overflow-y-auto ${
+        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+      }`}
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
+      <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md text-center transition-all ${
         isDarkMode 
           ? 'bg-neutral-900/90 border-neutral-800/80 shadow-black/60' 
           : 'bg-white border-slate-200/80 shadow-slate-300/40'

@@ -17,10 +17,13 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
   const isMultiDeviceBlock = profile?.blockedReason === 'multi_device' || (profile?.failedDeviceAttempts || 0) >= 1;
 
   return (
-    <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 transition-colors select-none ${
-      isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-    }`}>
-      <div className={`w-full max-w-md rounded-3xl p-8 border shadow-2xl backdrop-blur-md text-center transition-all ${
+    <div 
+      className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 transition-colors select-none overflow-y-auto ${
+        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+      }`}
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
+      <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md text-center transition-all ${
         isDarkMode 
           ? 'bg-neutral-900/90 border-rose-900/30 shadow-black/60' 
           : 'bg-white border-rose-200/80 shadow-rose-300/40'
@@ -50,8 +53,8 @@ export const BlockedView: React.FC<BlockedViewProps> = ({ user, profile, isDarkM
           </p>
           <p className="text-[11px] text-rose-200/80 leading-relaxed font-semibold">
             {isMultiDeviceBlock 
-              ? 'Access Blocked: Concurrent multi-device login detected. Your account has been suspended for security.'
-              : 'Your transaction submission was rejected or access has been administratively restricted. Please contact support if you believe this is a mistake.'}
+              ? 'Access Blocked: Concurrent multi-device login detected. Your account has been suspended for security. Please contact the administrator to resolve this issue.'
+              : 'Your transaction submission was rejected or access has been administratively restricted. Please contact the administrator to resolve this issue.'}
           </p>
         </div>
 

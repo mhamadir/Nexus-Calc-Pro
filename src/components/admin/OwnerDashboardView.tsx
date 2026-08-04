@@ -215,19 +215,22 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   // Deny non-admin immediately
   if (!isAdmin) {
     return (
-      <div className={`min-h-screen w-full flex items-center justify-center p-4 select-none ${
-        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-      }`}>
+      <div 
+        className={`min-h-screen max-h-screen h-screen w-full flex items-center justify-center p-4 select-none overflow-y-auto ${
+          isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+        }`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         <div className="w-full max-w-md p-8 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-center">
           <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
           <h2 className="text-xl font-black text-rose-500 mb-2">Access Denied</h2>
-          <p className="text-xs text-neutral-300 mb-6">
-            The Owner Control Center is restricted exclusively to administrator email: <br />
-            <span className="font-mono font-bold text-white">yousifir431@gmail.com</span>
+          <p className="text-xs text-neutral-300 mb-6 leading-relaxed">
+            The Owner Control Center is restricted exclusively to the administrator. <br />
+            <span className="font-semibold text-rose-300">Please contact the administrator to resolve this issue.</span>
           </p>
           <button
             onClick={() => signOut(auth)}
-            className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold"
+            className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold cursor-pointer"
           >
             Sign Out
           </button>
@@ -239,10 +242,13 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   // Render Mandatory Security OTP Verification Protocol for Administrator
   if (!isOtpVerified) {
     return (
-      <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 select-none ${
-        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-      }`}>
-        <div className={`w-full max-w-md rounded-3xl p-8 border shadow-2xl backdrop-blur-md transition-all ${
+      <div 
+        className={`min-h-screen max-h-screen h-screen w-full flex flex-col items-center justify-start md:justify-center p-4 select-none overflow-y-auto ${
+          isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+        }`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className={`w-full max-w-md my-auto rounded-3xl p-8 border shadow-2xl backdrop-blur-md transition-all ${
           isDarkMode 
             ? 'bg-neutral-900/90 border-neutral-800/80 shadow-black/60' 
             : 'bg-white border-slate-200/80 shadow-slate-300/40'
@@ -261,8 +267,8 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
             Administrator OTP Verification
           </p>
 
-          <p className="text-xs text-neutral-400 text-center mb-6">
-            Enforcing mandatory security code verification for account <span className="font-bold text-white">yousifir431@gmail.com</span>.
+          <p className="text-xs text-neutral-400 text-center mb-6 leading-relaxed">
+            Enforcing mandatory security code verification for administrator account. Please contact the administrator to resolve this issue.
           </p>
 
           {/* Prompt hint box displaying the passcode */}
@@ -322,9 +328,12 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
   );
 
   return (
-    <div className={`min-h-screen w-full flex flex-col select-none ${
-      isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-    }`}>
+    <div 
+      className={`min-h-screen max-h-screen h-screen w-full flex flex-col select-none overflow-y-auto ${
+        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
+      }`}
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       
       {/* Top Admin Header */}
       <header className={`px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${
@@ -341,8 +350,8 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({
                 Admin Verified
               </span>
             </div>
-            <p className="text-xs text-neutral-400 font-mono">
-              yousifir431@gmail.com
+            <p className="text-xs text-neutral-400 font-medium">
+              Administrator Account
             </p>
           </div>
         </div>
