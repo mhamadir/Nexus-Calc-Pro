@@ -58,9 +58,15 @@ const decodeAuthPayload = <T,>(encodedStr: string | null): T | null => {
 const getInitialOfflineAuth = () => {
   if (typeof localStorage === 'undefined') return null;
   try {
+    const cachedStatus = localStorage.getItem('userStatus');
     const saved = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-    if (saved && saved.status === 'active') {
-      return saved;
+    if (cachedStatus === 'active' || saved?.status === 'active') {
+      return saved || {
+        uid: '',
+        email: '',
+        displayName: 'Google User',
+        status: 'active'
+      };
     }
   } catch (_) {}
   return null;
@@ -325,15 +331,30 @@ export default function App() {
         setShowOwnerDashboard(true);
       }
 
-      // Block direct redirect: set initial payment verification loading state
-      setIsVerifyingPayment(true);
+      // Check fast-pass cache for active paid users
+      const cachedUserStatus = localStorage.getItem('userStatus');
+      const isFastPass = cachedUserStatus === 'active' || initialOfflineAuth?.status === 'active';
+      if (isFastPass) {
+        setAuthLoading(false);
+        setIsVerifyingPayment(false);
+      } else {
+        setIsVerifyingPayment(true);
+      }
 
       // Setup real-time listener on user profile document in Firestore
       const userDocRef = doc(db, 'users', currentUser.uid);
+      const currentDeviceId = localStorage.getItem('currentDeviceId') || getLocalDeviceId();
+      localStorage.setItem('currentDeviceId', currentDeviceId);
       
-      // Enforce Payment Route Guard: Fetch user document at /users/{uid} immediately
+      // Enforce Payment Route Guard & Background Device Verification
       try {
-        const docSnap = await getDoc(userDocRef);
+        const docSnap = await Promise.race([
+          getDoc(userDocRef),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Firestore status fetch timeout')), 2500)
+          )
+        ]);
+
         if (!docSnap.exists()) {
           // Case A (Document Does NOT Exist): Auto-create user document with status: "pending" and failedDeviceAttempts: 0
           const initialProfile: UserProfile = {
@@ -346,15 +367,76 @@ export default function App() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
-          await setDoc(userDocRef, initialProfile);
+          setDoc(userDocRef, initialProfile).catch((e) => console.error('Error auto-creating initial user doc:', e));
           setUserProfile(initialProfile);
+          localStorage.removeItem('userStatus');
         } else {
-          // Case B / C: Document exists, set userProfile state
+          // Case B / C: Document exists, check status and device lock
           const profileData = docSnap.data() as UserProfile;
-          setUserProfile(profileData);
+          const isMultiDeviceMismatch = profileData.activeDeviceId && profileData.activeDeviceId !== currentDeviceId;
+
+          if (profileData.status !== 'active' || isMultiDeviceMismatch) {
+            // Kick user out, clear cache, display Security Block / Payment Screen
+            localStorage.removeItem('userStatus');
+            localStorage.removeItem(OFFLINE_AUTH_KEY);
+
+            const blockedProfile: UserProfile = {
+              ...profileData,
+              status: isMultiDeviceMismatch ? 'blocked' : profileData.status,
+              blockedReason: isMultiDeviceMismatch ? 'multi_device' : profileData.blockedReason,
+              failedDeviceAttempts: isMultiDeviceMismatch ? 1 : (profileData.failedDeviceAttempts || 0)
+            };
+            setUserProfile(blockedProfile);
+
+            if (isMultiDeviceMismatch) {
+              updateDoc(userDocRef, {
+                status: 'blocked',
+                blockedReason: 'multi_device',
+                failedDeviceAttempts: 1,
+                lastAttemptDeviceId: currentDeviceId,
+                updatedAt: new Date().toISOString()
+              }).catch((err) => console.error('Error auto-blocking multi-device user:', err));
+
+              sendTelegramSecurityBlockAlert(
+                telegramConfig,
+                currentUser.email || 'No email',
+                profileData.displayName || currentUser.displayName || 'Google User',
+                currentUser.uid
+              ).catch((err) => console.error('Error sending auto-block Telegram security alert:', err));
+            }
+          } else {
+            // Active paid user on verified device
+            localStorage.setItem('userStatus', 'active');
+            setUserProfile(profileData);
+          }
         }
       } catch (err) {
         console.error('Error fetching Firestore user document:', err);
+        const cachedUserStatusErr = localStorage.getItem('userStatus');
+        const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
+
+        if ((cachedUserStatusErr === 'active' || savedOfflineAuth?.status === 'active') && savedOfflineAuth?.uid === currentUser.uid) {
+          setUserProfile({
+            uid: currentUser.uid,
+            email: currentUser.email || 'Google User',
+            displayName: currentUser.displayName || 'Google User',
+            status: 'active',
+            activeDeviceId: currentDeviceId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          setUserProfile((prev) => prev || {
+            uid: currentUser.uid,
+            email: currentUser.email || 'No Email',
+            displayName: currentUser.displayName || 'Google User',
+            photoURL: currentUser.photoURL || undefined,
+            status: 'pending',
+            failedDeviceAttempts: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
       } finally {
         setAuthLoading(false);
         setIsVerifyingPayment(false);
@@ -364,29 +446,47 @@ export default function App() {
       const unsubscribeProfile = onSnapshot(userDocRef, (snap) => {
         if (snap.exists()) {
           const profileData = snap.data() as UserProfile;
-          setUserProfile(profileData);
+          const isMultiDeviceMismatch = profileData.activeDeviceId && profileData.activeDeviceId !== currentDeviceId;
 
-          // Save active authorization state to encrypted localStorage for instant offline PWA access
-          if (profileData.status === 'active') {
+          if (profileData.status !== 'active' || isMultiDeviceMismatch) {
+            localStorage.removeItem('userStatus');
+            localStorage.removeItem(OFFLINE_AUTH_KEY);
+
+            setUserProfile({
+              ...profileData,
+              status: isMultiDeviceMismatch ? 'blocked' : profileData.status,
+              blockedReason: isMultiDeviceMismatch ? 'multi_device' : profileData.blockedReason,
+              failedDeviceAttempts: isMultiDeviceMismatch ? 1 : (profileData.failedDeviceAttempts || 0)
+            });
+
+            if (isMultiDeviceMismatch) {
+              updateDoc(userDocRef, {
+                status: 'blocked',
+                blockedReason: 'multi_device',
+                failedDeviceAttempts: 1,
+                lastAttemptDeviceId: currentDeviceId,
+                updatedAt: new Date().toISOString()
+              }).catch((e) => console.error('Error auto-blocking in snapshot:', e));
+            }
+          } else {
+            localStorage.setItem('userStatus', 'active');
+            setUserProfile(profileData);
+
             const offlinePayload = {
               uid: currentUser.uid,
               email: currentUser.email || 'Google User',
               displayName: profileData.displayName || currentUser.displayName || 'Google User',
               photoURL: profileData.photoURL || currentUser.photoURL,
               status: 'active',
-              activeDeviceId: profileData.activeDeviceId || getLocalDeviceId(),
+              activeDeviceId: profileData.activeDeviceId || currentDeviceId,
               token: `nexus_tok_${currentUser.uid}_${Date.now()}`,
               updatedAt: new Date().toISOString()
             };
             try {
               localStorage.setItem(OFFLINE_AUTH_KEY, encodeAuthPayload(offlinePayload));
             } catch (_) {}
-          } else {
-            // Clear cached authorization state if user is blocked or unverified
-            localStorage.removeItem(OFFLINE_AUTH_KEY);
           }
         } else {
-          // Missing user document fallback: initialize default user profile cleanly without crashing
           const fallbackProfile: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || 'No Email',
@@ -398,25 +498,13 @@ export default function App() {
             updatedAt: new Date().toISOString()
           };
           setUserProfile(fallbackProfile);
+          localStorage.removeItem('userStatus');
           setDoc(userDocRef, fallbackProfile).catch((e) => console.error('Error initializing fallback profile doc:', e));
         }
         setAuthLoading(false);
         setIsVerifyingPayment(false);
       }, (err) => {
         console.error('Error subscribing to user profile:', err);
-        // Fallback to offline cached authorization if network/firestore drops
-        const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-        if (savedOfflineAuth && savedOfflineAuth.status === 'active') {
-          setUserProfile({
-            uid: savedOfflineAuth.uid,
-            email: savedOfflineAuth.email,
-            displayName: savedOfflineAuth.displayName,
-            status: 'active',
-            activeDeviceId: savedOfflineAuth.activeDeviceId,
-            createdAt: savedOfflineAuth.updatedAt || new Date().toISOString(),
-            updatedAt: savedOfflineAuth.updatedAt || new Date().toISOString()
-          });
-        }
         setAuthLoading(false);
         setIsVerifyingPayment(false);
       });
@@ -427,33 +515,44 @@ export default function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Safety fallback timer for offline initializations
+  // 2.5-Second Safety Timeout Guard: Forces resolution of loading screen within 2.5s maximum
   useEffect(() => {
+    if (!authLoading && !isVerifyingPayment) return;
+
     const timer = setTimeout(() => {
-      if (authLoading) {
-        const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-        if (savedOfflineAuth && savedOfflineAuth.status === 'active') {
-          setUser({
-            uid: savedOfflineAuth.uid,
-            email: savedOfflineAuth.email,
-            displayName: savedOfflineAuth.displayName,
-            photoURL: savedOfflineAuth.photoURL
-          } as User);
-          setUserProfile({
-            uid: savedOfflineAuth.uid,
-            email: savedOfflineAuth.email,
-            displayName: savedOfflineAuth.displayName,
-            status: 'active',
-            activeDeviceId: savedOfflineAuth.activeDeviceId,
-            createdAt: savedOfflineAuth.updatedAt || new Date().toISOString(),
-            updatedAt: savedOfflineAuth.updatedAt || new Date().toISOString()
-          });
-        }
-        setAuthLoading(false);
+      console.warn('2.5-Second Safety Timeout Triggered. Forcing resolution of loading state.');
+
+      const cachedUserStatus = localStorage.getItem('userStatus');
+      const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
+
+      if ((cachedUserStatus === 'active' || savedOfflineAuth?.status === 'active') && user) {
+        setUserProfile((prev) => prev || {
+          uid: user.uid,
+          email: user.email || 'Google User',
+          displayName: user.displayName || 'Google User',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      } else if (user && !userProfile) {
+        setUserProfile({
+          uid: user.uid,
+          email: user.email || 'No Email',
+          displayName: user.displayName || 'Google User',
+          photoURL: user.photoURL || undefined,
+          status: 'pending',
+          failedDeviceAttempts: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
       }
+
+      setAuthLoading(false);
+      setIsVerifyingPayment(false);
     }, 2500);
+
     return () => clearTimeout(timer);
-  }, [authLoading]);
+  }, [authLoading, isVerifyingPayment, user, userProfile]);
 
 
   // Persistent state synchronization to localStorage

@@ -225,45 +225,35 @@ export default function StandardTab({
   return (
     <div 
       id="standard-tab-view" 
-      className="flex flex-col h-[100dvh] max-h-[100dvh] md:h-full md:max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1 pb-0.5 box-border"
+      className="flex flex-col h-full max-h-full w-full justify-between overflow-hidden overflow-y-hidden select-none p-1.5 pb-[env(safe-area-inset-bottom,0px)] box-border flex-1 min-h-0"
       style={{
-        height: '100dvh',
-        maxHeight: '100dvh',
+        height: '100%',
+        maxHeight: '100%',
         overflow: 'hidden',
         overflowY: 'hidden',
         touchAction: 'none',
         overscrollBehavior: 'none',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)'
       }}
     >
       <style>{`
         #standard-tab-view {
           touch-action: none !important;
           overscroll-behavior: none !important;
-          height: 100dvh !important;
-          max-height: 100dvh !important;
+          height: 100% !important;
+          max-height: 100% !important;
           overflow: hidden !important;
           overflow-y: hidden !important;
           display: flex !important;
           flex-direction: column !important;
           box-sizing: border-box !important;
-        }
-        @media (max-width: 767px) {
-          #standard-tab-view {
-            position: fixed !important;
-            inset: 0 !important;
-            height: 100dvh !important;
-            width: 100vw !important;
-          }
-        }
-        @media (min-width: 768px) {
-          #standard-tab-view {
-            position: relative !important;
-            height: 100% !important;
-            max-height: 100% !important;
-            width: 100% !important;
-          }
+          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+          position: relative !important;
+          width: 100% !important;
+          flex: 1 1 0% !important;
+          min-height: 0 !important;
         }
         #standard-keyboard-container {
           flex: 1 1 0% !important;
@@ -271,14 +261,24 @@ export default function StandardTab({
           overflow: hidden !important;
           display: flex !important;
           flex-direction: column !important;
+          justify-content: space-between !important;
+          gap: 0.375rem !important;
         }
         #sci-grid {
           flex: 1 1 0% !important;
           min-height: 0 !important;
+          gap: 0.375rem !important;
+          display: grid !important;
+          grid-template-columns: repeat(6, 1fr) !important;
+          grid-template-rows: repeat(4, 1fr) !important;
         }
         #basic-grid {
           flex: 1.4 1 0% !important;
           min-height: 0 !important;
+          gap: 0.375rem !important;
+          display: grid !important;
+          grid-template-columns: repeat(4, 1fr) !important;
+          grid-template-rows: repeat(5, 1fr) !important;
         }
         #sci-grid button, #basic-grid button {
           min-height: 0 !important;
@@ -433,11 +433,11 @@ export default function StandardTab({
       </div>
 
       {/* Master Keyboard Container */}
-      <div id="standard-keyboard-container" className="flex flex-col gap-1 flex-1 min-h-0 w-full overflow-hidden landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:h-auto landscape:flex-1">
+      <div id="standard-keyboard-container" className="flex flex-col gap-1.5 flex-1 min-h-0 w-full overflow-hidden justify-between landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:h-auto landscape:flex-1">
         {/* 40% Middle Scientific Function Grid */}
         <div 
           id="sci-grid" 
-          className="grid grid-cols-6 grid-rows-4 gap-1 w-full flex-1 min-h-0"
+          className="grid grid-cols-6 grid-rows-4 gap-1.5 w-full flex-1 min-h-0"
         >
           {sciButtons.map(({ label, val }) => (
             <button
@@ -459,7 +459,7 @@ export default function StandardTab({
         {/* 35% Bottom Basic Number Pad */}
         <div 
           id="basic-grid" 
-          className="grid grid-cols-4 grid-rows-5 gap-1 w-full flex-[1.4] min-h-0"
+          className="grid grid-cols-4 grid-rows-5 gap-1.5 w-full flex-[1.4] min-h-0"
         >
           {/* Row 1 */}
           <button
@@ -610,7 +610,7 @@ export default function StandardTab({
           <button
             id="btn-eval"
             onClick={() => handlePress('=')}
-            className={`row-span-2 flex items-center justify-center text-white w-full h-full font-bold text-3xl shadow-md cursor-pointer transition-all active:scale-95 rounded-2xl bg-[#ff9f0a] hover:bg-[#ffb340] active:brightness-95`}
+            className={`row-span-2 col-start-4 row-start-4 flex items-center justify-center text-white w-full h-full font-bold text-3xl shadow-md cursor-pointer transition-all active:scale-95 rounded-2xl bg-[#ff9f0a] hover:bg-[#ffb340] active:brightness-95`}
           >
             =
           </button>
@@ -619,7 +619,7 @@ export default function StandardTab({
           <button
             id="btn-num-0"
             onClick={() => handlePress('0')}
-            className={`col-span-2 flex items-center justify-center w-full h-full text-xl font-medium rounded-2xl active:scale-95 transition-all duration-150 ${
+            className={`col-span-2 col-start-1 row-start-5 flex items-center justify-center w-full h-full text-xl font-medium rounded-2xl active:scale-95 transition-all duration-150 ${
               isDarkMode ? 'bg-[#2c2c2e] hover:bg-[#3a3a3c] text-white' : 'bg-slate-100/95 text-slate-800 border border-slate-200/30 font-medium hover:bg-slate-200'
             }`}
           >
@@ -628,7 +628,7 @@ export default function StandardTab({
           <button
             id="btn-num-dot"
             onClick={() => handlePress('.')}
-            className={`flex items-center justify-center w-full h-full text-xl font-bold rounded-2xl active:scale-95 transition-all duration-150 ${
+            className={`col-start-3 row-start-5 flex items-center justify-center w-full h-full text-xl font-bold rounded-2xl active:scale-95 transition-all duration-150 ${
               isDarkMode ? 'bg-[#2c2c2e] hover:bg-[#3a3a3c] text-white' : 'bg-slate-100/95 text-slate-800 border border-slate-200/30 hover:bg-slate-200 font-bold'
             }`}
           >
