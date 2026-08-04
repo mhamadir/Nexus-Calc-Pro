@@ -66,6 +66,55 @@ const getInitialOfflineAuth = () => {
   return null;
 };
 
+interface ProtectedRouteGuardProps {
+  user: User | null;
+  userStatus: string;
+  failedAttempts: number;
+  userProfile: UserProfile | null;
+  telegramConfig: TelegramConfig;
+  isDarkMode: boolean;
+  children: React.ReactNode;
+}
+
+function ProtectedRouteGuard({
+  user,
+  userStatus,
+  failedAttempts,
+  userProfile,
+  telegramConfig,
+  isDarkMode,
+  children
+}: ProtectedRouteGuardProps) {
+  if (!user) {
+    return <GoogleSignInView isDarkMode={isDarkMode} />;
+  }
+
+  if (userStatus === 'blocked' || failedAttempts >= 1) {
+    return <BlockedView user={user} profile={userProfile} isDarkMode={isDarkMode} />;
+  }
+
+  if (userStatus !== 'active') {
+    if (userStatus === 'pending' && userProfile?.paymentDetails) {
+      return (
+        <PendingVerificationView 
+          user={user} 
+          profile={userProfile} 
+          isDarkMode={isDarkMode} 
+        />
+      );
+    }
+    return (
+      <TransactionSubmissionView 
+        user={user} 
+        telegramConfig={telegramConfig} 
+        isDarkMode={isDarkMode} 
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export default function App() {
   const initialOfflineAuth = getInitialOfflineAuth();
 
@@ -99,6 +148,9 @@ export default function App() {
 
   const [authLoading, setAuthLoading] = useState<boolean>(() => {
     // If a valid saved offline authorization token exists, authLoading is false immediately!
+    return !initialOfflineAuth;
+  });
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState<boolean>(() => {
     return !initialOfflineAuth;
   });
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({ botToken: '', chatId: '' });
@@ -273,13 +325,17 @@ export default function App() {
         setShowOwnerDashboard(true);
       }
 
+      // Block direct redirect: set initial payment verification loading state
+      setIsVerifyingPayment(true);
+
       // Setup real-time listener on user profile document in Firestore
       const userDocRef = doc(db, 'users', currentUser.uid);
       
-      // Ensure user document exists in Firestore
+      // Enforce Payment Route Guard: Fetch user document at /users/{uid} immediately
       try {
         const docSnap = await getDoc(userDocRef);
         if (!docSnap.exists()) {
+          // Case A (Document Does NOT Exist): Auto-create user document with status: "pending" and failedDeviceAttempts: 0
           const initialProfile: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || 'No Email',
@@ -291,9 +347,17 @@ export default function App() {
             updatedAt: new Date().toISOString()
           };
           await setDoc(userDocRef, initialProfile);
+          setUserProfile(initialProfile);
+        } else {
+          // Case B / C: Document exists, set userProfile state
+          const profileData = docSnap.data() as UserProfile;
+          setUserProfile(profileData);
         }
       } catch (err) {
-        console.error('Error ensuring Firestore user document:', err);
+        console.error('Error fetching Firestore user document:', err);
+      } finally {
+        setAuthLoading(false);
+        setIsVerifyingPayment(false);
       }
 
       // Real-time snapshot listener on user document
@@ -337,6 +401,7 @@ export default function App() {
           setDoc(userDocRef, fallbackProfile).catch((e) => console.error('Error initializing fallback profile doc:', e));
         }
         setAuthLoading(false);
+        setIsVerifyingPayment(false);
       }, (err) => {
         console.error('Error subscribing to user profile:', err);
         // Fallback to offline cached authorization if network/firestore drops
@@ -353,6 +418,7 @@ export default function App() {
           });
         }
         setAuthLoading(false);
+        setIsVerifyingPayment(false);
       });
 
       return () => unsubscribeProfile();
@@ -805,8 +871,8 @@ export default function App() {
   // AUTHENTICATION & ACCESS GATING CONTROLLER
   // --------------------------------------------------------------------------
 
-  // 1. Loading State
-  if (authLoading) {
+  // 1. Loading State (Auth or Payment Status Verification)
+  if (authLoading || isVerifyingPayment) {
     return (
       <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 select-none ${
         isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
@@ -814,7 +880,7 @@ export default function App() {
         <div className="flex flex-col items-center space-y-4">
           <RefreshCw className="w-10 h-10 animate-spin text-cyan-400" />
           <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-            Verifying System Credentials...
+            Verifying Payment & System Credentials...
           </p>
         </div>
       </div>
@@ -841,80 +907,61 @@ export default function App() {
   const userStatus = userProfile?.status || 'pending';
   const failedAttempts = userProfile?.failedDeviceAttempts || 0;
 
-  // State: Blocked or device attempt limit reached (failedDeviceAttempts >= 1) -> Lock account & render Blocked View
-  if (userStatus === 'blocked' || failedAttempts >= 1) {
-    return <BlockedView user={user} profile={userProfile} isDarkMode={isDarkMode} />;
-  }
-
-  // State: Non-active User (pending, unpaid, unverified, expired) -> Enforce Payment Gate
-  if (userStatus !== 'active') {
-    // If pending and payment details were already submitted, render Pending Verification View
-    if (userStatus === 'pending' && userProfile?.paymentDetails) {
-      return (
-        <PendingVerificationView 
-          user={user} 
-          profile={userProfile} 
-          isDarkMode={isDarkMode} 
-        />
-      );
-    }
-    // Otherwise redirect directly to Payment / Checkout Page
-    return (
-      <TransactionSubmissionView 
-        user={user} 
-        telegramConfig={telegramConfig} 
-        isDarkMode={isDarkMode} 
-      />
-    );
-  }
-
-  // State: Active -> Render Full Unlocked PWA Engineering Calculator App!
+  // Render Full Unlocked App inside ProtectedRouteGuard
   return (
-    <div className={`min-h-screen h-[100dvh] max-h-[100dvh] w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans overflow-hidden overflow-y-hidden ${
-      isDarkMode ? 'bg-zinc-950 text-neutral-100' : 'bg-slate-50 text-slate-800'
-    }`}>
-      
-      {/* Visual Ambient Background Blobs */}
-      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
+    <ProtectedRouteGuard
+      user={user}
+      userStatus={userStatus}
+      failedAttempts={failedAttempts}
+      userProfile={userProfile}
+      telegramConfig={telegramConfig}
+      isDarkMode={isDarkMode}
+    >
+      <div className={`min-h-screen h-[100dvh] max-h-[100dvh] w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans overflow-hidden overflow-y-hidden ${
+        isDarkMode ? 'bg-zinc-950 text-neutral-100' : 'bg-slate-50 text-slate-800'
+      }`}>
+        
+        {/* Visual Ambient Background Blobs */}
+        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
 
-      {/* Primary Phone Container */}
-      <div 
-        id="phone-frame-container" 
-        className={`w-full h-screen h-[100dvh] max-h-[100dvh] md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden overflow-y-hidden shadow-2xl relative border transition-all duration-250 md:aspect-[9/18a] ${
-          isDarkMode 
-            ? 'bg-zinc-950 border-neutral-800/80 shadow-black' 
-            : 'bg-white border-slate-200 shadow-slate-300'
-        }`}
-      >
-        {/* Admin floating button for administrator */}
-        {user.email === 'yousifir431@gmail.com' && (
-          <div className="absolute top-2 right-2 z-50">
-            <button
-              onClick={() => setShowOwnerDashboard(true)}
-              className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-md hover:bg-cyan-500/30 transition-all"
-              title="Open Owner Control Center"
-            >
-              <ShieldCheck size={12} />
-              <span>Admin</span>
-            </button>
-          </div>
-        )}
-
-        {/* Inner Viewport Screen */}
-        <div className="flex-1 w-full max-w-full overflow-hidden overflow-y-hidden min-h-0 p-0 md:p-3.5 pb-0 flex flex-col justify-between">
-          {renderActiveScreen()}
-        </div>
-
-        {/* Bottom Navigation Bar */}
+        {/* Primary Phone Container */}
         <div 
-          id="bottom-tab-navigation"
-          className={`h-14 border-t flex justify-around items-center shrink-0 z-10 px-0.5 select-none ${
+          id="phone-frame-container" 
+          className={`w-full h-screen h-[100dvh] max-h-[100dvh] md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden overflow-y-hidden shadow-2xl relative border transition-all duration-250 md:aspect-[9/18a] ${
             isDarkMode 
-              ? 'bg-neutral-950 border-neutral-800 text-neutral-400' 
-              : 'bg-slate-50 border-slate-200 text-slate-500'
+              ? 'bg-zinc-950 border-neutral-800/80 shadow-black' 
+              : 'bg-white border-slate-200 shadow-slate-300'
           }`}
         >
+          {/* Admin floating button for administrator */}
+          {user.email === 'yousifir431@gmail.com' && (
+            <div className="absolute top-2 right-2 z-50">
+              <button
+                onClick={() => setShowOwnerDashboard(true)}
+                className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-md hover:bg-cyan-500/30 transition-all"
+                title="Open Owner Control Center"
+              >
+                <ShieldCheck size={12} />
+                <span>Admin</span>
+              </button>
+            </div>
+          )}
+
+          {/* Inner Viewport Screen */}
+          <div className="flex-1 w-full max-w-full overflow-hidden overflow-y-hidden min-h-0 p-0 md:p-3.5 pb-0 flex flex-col justify-between">
+            {renderActiveScreen()}
+          </div>
+
+          {/* Bottom Navigation Bar */}
+          <div 
+            id="bottom-tab-navigation"
+            className={`h-14 border-t flex justify-around items-center shrink-0 z-10 px-0.5 select-none ${
+              isDarkMode 
+                ? 'bg-neutral-950 border-neutral-800 text-neutral-400' 
+                : 'bg-slate-50 border-slate-200 text-slate-500'
+            }`}
+          >
           {/* Standard */}
           <button
             id="tab-btn-standard"
@@ -1007,5 +1054,6 @@ export default function App() {
 
       </div>
     </div>
+    </ProtectedRouteGuard>
   );
 }

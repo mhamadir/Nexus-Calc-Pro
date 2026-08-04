@@ -38,6 +38,22 @@ export default function StandardTab({
   // Track if we just finished evaluating using the "=" key
   const [justEvaluated, setJustEvaluated] = useState(false);
 
+  // Bulletproof Touch-Lock to prevent mobile pull-to-refresh & dragging on Standard Tab
+  useEffect(() => {
+    const preventScroll = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+    document.body.addEventListener('touchmove', preventScroll, { passive: false });
+    document.body.style.touchAction = 'none';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.removeEventListener('touchmove', preventScroll);
+      document.body.style.touchAction = '';
+      document.body.style.overscrollBehavior = '';
+    };
+  }, []);
+
   // Re-calculate the expression in real-time as user types
   useEffect(() => {
     if (justEvaluated) {
@@ -215,12 +231,16 @@ export default function StandardTab({
         maxHeight: '100dvh',
         overflow: 'hidden',
         overflowY: 'hidden',
+        touchAction: 'none',
+        overscrollBehavior: 'none',
         display: 'flex',
         flexDirection: 'column'
       }}
     >
       <style>{`
         #standard-tab-view {
+          touch-action: none !important;
+          overscroll-behavior: none !important;
           height: 100dvh !important;
           max-height: 100dvh !important;
           overflow: hidden !important;
@@ -229,10 +249,20 @@ export default function StandardTab({
           flex-direction: column !important;
           box-sizing: border-box !important;
         }
+        @media (max-width: 767px) {
+          #standard-tab-view {
+            position: fixed !important;
+            inset: 0 !important;
+            height: 100dvh !important;
+            width: 100vw !important;
+          }
+        }
         @media (min-width: 768px) {
           #standard-tab-view {
+            position: relative !important;
             height: 100% !important;
             max-height: 100% !important;
+            width: 100% !important;
           }
         }
         #standard-keyboard-container {
