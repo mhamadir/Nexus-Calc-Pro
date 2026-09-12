@@ -169,6 +169,7 @@ export default function StandardTab({
         setJustEvaluated(true);
       }
     } else {
+      const wasJustEvaluated = justEvaluated;
       setJustEvaluated(false);
       if (isErrorState) {
         // If an operator is clicked, prefix with 0 to prevent syntax errors
@@ -178,8 +179,24 @@ export default function StandardTab({
         } else {
           setExpression(value);
         }
+      } else if (wasJustEvaluated) {
+        // If an operator or power/percent is clicked, chain onto the previous result
+        const isOperator = ['+', '-', '×', '÷', '^', '%', '^2', '^3'].includes(value);
+        if (isOperator) {
+          setExpression(prev => prev + value);
+        } else {
+          // If a new number or function is clicked, start a fresh expression
+          setExpression(value);
+        }
       } else {
-        setExpression(prev => prev + value);
+        setExpression(prev => {
+          if (prev === '') {
+            const isOp = ['+', '×', '÷', '^', '%'].includes(value);
+            if (isOp) return '0' + value;
+            if (value === '^2' || value === '^3') return '0' + value;
+          }
+          return prev + value;
+        });
       }
     }
   };

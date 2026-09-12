@@ -1062,7 +1062,7 @@ export default function MatricesTab({
                 className={`w-9 text-center font-mono font-bold text-[9px] focus:outline-none bg-transparent ${
                   isDarkMode 
                     ? 'text-white' 
-                    : 'text-slate-80'
+                    : 'text-slate-800'
                 }`}
               />
             </div>

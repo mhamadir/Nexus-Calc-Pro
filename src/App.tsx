@@ -5,225 +5,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Calculator, Grid3X3, Crosshair, RotateCcw, Sliders,
-  Wifi, Battery, History, ShieldCheck, LogOut, RefreshCw, KeyRound
+  Calculator, Grid3X3, Crosshair, RotateCcw, Sliders, History
 } from 'lucide-react';
-import { TabType, HistoryItem, CentroidShape, UserProfile, TelegramConfig } from './types';
+import { TabType, HistoryItem, CentroidShape } from './types';
 import StandardTab from './components/StandardTab';
 import MatricesTab from './components/MatricesTab';
 import CentroidsTab from './components/CentroidsTab';
 import MOITab from './components/MOITab';
 import HistoryTab from './components/HistoryTab';
 import SettingsTab from './components/SettingsTab';
-import { GoogleSignInView } from './components/auth/GoogleSignInView';
-import { TransactionSubmissionView } from './components/auth/TransactionSubmissionView';
-import { PendingVerificationView } from './components/auth/PendingVerificationView';
-import { BlockedView } from './components/auth/BlockedView';
-import { OwnerDashboardView } from './components/admin/OwnerDashboardView';
-import { playMechanicalClick, triggerHaptic } from './utils/feedback';
-import { sendTelegramSecurityBlockAlert } from './utils/telegram';
-import { getLocalDeviceId } from './utils/device';
-import { 
-  auth, 
-  db, 
-  onAuthStateChanged, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc,
-  onSnapshot, 
-  User, 
-  signOut 
-} from './lib/firebase';
-
-const OFFLINE_AUTH_KEY = 'nexus_offline_auth_state_v2';
-
-const encodeAuthPayload = (data: any): string => {
-  try {
-    return btoa(encodeURIComponent(JSON.stringify(data)));
-  } catch (_) {
-    return '';
-  }
-};
-
-const decodeAuthPayload = <T,>(encodedStr: string | null): T | null => {
-  if (!encodedStr) return null;
-  try {
-    return JSON.parse(decodeURIComponent(atob(encodedStr))) as T;
-  } catch (_) {
-    return null;
-  }
-};
-
-const getInitialOfflineAuth = () => {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    const cachedStatus = localStorage.getItem('userStatus');
-    const saved = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-    if (cachedStatus === 'active' || saved?.status === 'active') {
-      return saved || {
-        uid: '',
-        email: '',
-        displayName: 'Google User',
-        status: 'active'
-      };
-    }
-  } catch (_) {}
-  return null;
-};
-
-interface ProtectedRouteGuardProps {
-  user: User | null;
-  userStatus: string;
-  failedAttempts: number;
-  userProfile: UserProfile | null;
-  telegramConfig: TelegramConfig;
-  isDarkMode: boolean;
-  children: React.ReactNode;
-}
-
-function ProtectedRouteGuard({
-  user,
-  userStatus,
-  failedAttempts,
-  userProfile,
-  telegramConfig,
-  isDarkMode,
-  children
-}: ProtectedRouteGuardProps) {
-  if (!user) {
-    return <GoogleSignInView isDarkMode={isDarkMode} />;
-  }
-
-  if (userStatus === 'blocked' || failedAttempts >= 1) {
-    return <BlockedView user={user} profile={userProfile} isDarkMode={isDarkMode} />;
-  }
-
-  if (userStatus !== 'active') {
-    if (userStatus === 'pending' && userProfile?.paymentDetails) {
-      return (
-        <PendingVerificationView 
-          user={user} 
-          profile={userProfile} 
-          isDarkMode={isDarkMode} 
-        />
-      );
-    }
-    return (
-      <TransactionSubmissionView 
-        user={user} 
-        telegramConfig={telegramConfig} 
-        isDarkMode={isDarkMode} 
-      />
-    );
-  }
-
-  return <>{children}</>;
-}
+import { playMechanicalClick } from './utils/feedback';
 
 export default function App() {
-  const initialOfflineAuth = getInitialOfflineAuth();
-
-  // 1. Firebase Auth & Real-Time Profile Listener State (Offline-First Initialization)
-  const [user, setUser] = useState<User | null>(() => {
-    if (initialOfflineAuth) {
-      return {
-        uid: initialOfflineAuth.uid,
-        email: initialOfflineAuth.email,
-        displayName: initialOfflineAuth.displayName,
-        photoURL: initialOfflineAuth.photoURL
-      } as User;
-    }
-    return null;
-  });
-
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    if (initialOfflineAuth) {
-      return {
-        uid: initialOfflineAuth.uid,
-        email: initialOfflineAuth.email,
-        displayName: initialOfflineAuth.displayName,
-        status: 'active',
-        activeDeviceId: initialOfflineAuth.activeDeviceId,
-        createdAt: initialOfflineAuth.updatedAt || new Date().toISOString(),
-        updatedAt: initialOfflineAuth.updatedAt || new Date().toISOString()
-      };
-    }
-    return null;
-  });
-
-  const [authLoading, setAuthLoading] = useState<boolean>(() => {
-    // If a valid saved offline authorization token exists, authLoading is false immediately!
-    return !initialOfflineAuth;
-  });
-  const [isVerifyingPayment, setIsVerifyingPayment] = useState<boolean>(() => {
-    return !initialOfflineAuth;
-  });
-  const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({ botToken: '', chatId: '' });
-  const [showOwnerDashboard, setShowOwnerDashboard] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-
-  // Network connection status listeners
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Single-Device Locking & Automated Multi-Device Blocking Rule
-  useEffect(() => {
-    if (!user || !userProfile) return;
-    if (userProfile.status === 'blocked') return;
-
-    const currentDeviceId = getLocalDeviceId();
-
-    // 1. Initial binding if account has no registered activeDeviceId in Firestore (first time login or post-reset)
-    if (!userProfile.activeDeviceId) {
-      const userDocRef = doc(db, 'users', user.uid);
-      updateDoc(userDocRef, {
-        activeDeviceId: currentDeviceId,
-        failedDeviceAttempts: 0,
-        updatedAt: new Date().toISOString()
-      }).catch((err) => console.error('Error binding initial device fingerprint:', err));
-      return;
-    }
-
-    // 2. Multi-device attempt detection (Logging in from unauthorized/secondary device)
-    if (userProfile.activeDeviceId !== currentDeviceId) {
-      const sessionAttemptKey = `unauth_device_logged_${user.uid}_${currentDeviceId}`;
-      if (!sessionStorage.getItem(sessionAttemptKey)) {
-        sessionStorage.setItem(sessionAttemptKey, 'true');
-
-        const userDocRef = doc(db, 'users', user.uid);
-
-        // Instantly lock out: set status to blocked, failedDeviceAttempts to 1, blockedReason to multi_device
-        updateDoc(userDocRef, {
-          status: 'blocked',
-          blockedReason: 'multi_device',
-          failedDeviceAttempts: 1,
-          lastAttemptDeviceId: currentDeviceId,
-          updatedAt: new Date().toISOString()
-        }).then(() => {
-          // Trigger Automated Payload Alert to Telegram Bot
-          sendTelegramSecurityBlockAlert(
-            telegramConfig,
-            user.email || 'No email',
-            userProfile.displayName || user.displayName || 'Google User',
-            user.uid
-          ).catch((err) => console.error('Error sending auto-block Telegram security alert:', err));
-        }).catch((err) => console.error('Error auto-blocking user for multi-device login:', err));
-      }
-    }
-  }, [user, userProfile]);
-
-  // 2. Active Tab & Visual Settings
+  // 1. Navigation & Visual Settings (Persisted in localStorage)
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     try {
       const saved = localStorage.getItem('nexus_active_tab');
@@ -232,11 +26,11 @@ export default function App() {
       return 'Standard';
     }
   });
-  
+
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('nexus_is_dark_mode');
-      return saved ? JSON.parse(saved) : true;
+      return saved !== null ? JSON.parse(saved) : true;
     } catch (_) {
       return true;
     }
@@ -246,341 +40,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem('calcs_history_ledger');
       return saved ? JSON.parse(saved) : [];
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   });
 
-  // Load Telegram config from Firestore
-  useEffect(() => {
-    const fetchTelegramConfig = async () => {
-      try {
-        const configRef = doc(db, 'config', 'telegram');
-        const snap = await getDoc(configRef);
-        if (snap.exists()) {
-          setTelegramConfig(snap.data() as TelegramConfig);
-        }
-      } catch (err) {
-        console.error('Error fetching Telegram config:', err);
-      }
-    };
-    fetchTelegramConfig();
-  }, []);
-
-  // Listen to Auth State Changes & Sync Firestore User Document with Offline Fallback
-  useEffect(() => {
-    // 1. Initial check for offline launch with saved authorization state
-    if (!navigator.onLine) {
-      const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-      if (savedOfflineAuth && savedOfflineAuth.status === 'active') {
-        setUser({
-          uid: savedOfflineAuth.uid,
-          email: savedOfflineAuth.email,
-          displayName: savedOfflineAuth.displayName,
-          photoURL: savedOfflineAuth.photoURL
-        } as User);
-        setUserProfile({
-          uid: savedOfflineAuth.uid,
-          email: savedOfflineAuth.email,
-          displayName: savedOfflineAuth.displayName,
-          status: 'active',
-          activeDeviceId: savedOfflineAuth.activeDeviceId,
-          createdAt: savedOfflineAuth.updatedAt || new Date().toISOString(),
-          updatedAt: savedOfflineAuth.updatedAt || new Date().toISOString()
-        });
-        setAuthLoading(false);
-        return;
-      }
-    }
-
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-
-      if (!currentUser) {
-        // If network is offline, check saved offline state before resetting to null
-        if (!navigator.onLine) {
-          const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-          if (savedOfflineAuth && savedOfflineAuth.status === 'active') {
-            setUser({
-              uid: savedOfflineAuth.uid,
-              email: savedOfflineAuth.email,
-              displayName: savedOfflineAuth.displayName,
-              photoURL: savedOfflineAuth.photoURL
-            } as User);
-            setUserProfile({
-              uid: savedOfflineAuth.uid,
-              email: savedOfflineAuth.email,
-              displayName: savedOfflineAuth.displayName,
-              status: 'active',
-              activeDeviceId: savedOfflineAuth.activeDeviceId,
-              createdAt: savedOfflineAuth.updatedAt || new Date().toISOString(),
-              updatedAt: savedOfflineAuth.updatedAt || new Date().toISOString()
-            });
-            setAuthLoading(false);
-            return;
-          }
-        }
-
-        setUserProfile(null);
-        setAuthLoading(false);
-        return;
-      }
-
-      // If user is administrator, default option to open dashboard
-      if (currentUser.email === 'yousifir431@gmail.com') {
-        setShowOwnerDashboard(true);
-      }
-
-      // Check fast-pass cache for active paid users
-      const cachedUserStatus = localStorage.getItem('userStatus');
-      const isFastPass = cachedUserStatus === 'active' || initialOfflineAuth?.status === 'active';
-      if (isFastPass) {
-        setAuthLoading(false);
-        setIsVerifyingPayment(false);
-      } else {
-        setIsVerifyingPayment(true);
-      }
-
-      // Setup real-time listener on user profile document in Firestore
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      const currentDeviceId = localStorage.getItem('currentDeviceId') || getLocalDeviceId();
-      localStorage.setItem('currentDeviceId', currentDeviceId);
-      
-      // Enforce Payment Route Guard & Background Device Verification
-      try {
-        const docSnap = await Promise.race([
-          getDoc(userDocRef),
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Firestore status fetch timeout')), 2500)
-          )
-        ]);
-
-        if (!docSnap.exists()) {
-          // Case A (Document Does NOT Exist): Auto-create user document with status: "pending" and failedDeviceAttempts: 0
-          const initialProfile: UserProfile = {
-            uid: currentUser.uid,
-            email: currentUser.email || 'No Email',
-            displayName: currentUser.displayName || 'Google User',
-            photoURL: currentUser.photoURL || undefined,
-            status: 'pending',
-            failedDeviceAttempts: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          setDoc(userDocRef, initialProfile).catch((e) => console.error('Error auto-creating initial user doc:', e));
-          setUserProfile(initialProfile);
-          localStorage.removeItem('userStatus');
-        } else {
-          // Case B / C: Document exists, check status and device lock
-          const profileData = docSnap.data() as UserProfile;
-          const isMultiDeviceMismatch = profileData.activeDeviceId && profileData.activeDeviceId !== currentDeviceId;
-
-          if (profileData.status !== 'active' || isMultiDeviceMismatch) {
-            // Kick user out, clear cache, display Security Block / Payment Screen
-            localStorage.removeItem('userStatus');
-            localStorage.removeItem(OFFLINE_AUTH_KEY);
-
-            const blockedProfile: UserProfile = {
-              ...profileData,
-              status: isMultiDeviceMismatch ? 'blocked' : profileData.status,
-              blockedReason: isMultiDeviceMismatch ? 'multi_device' : profileData.blockedReason,
-              failedDeviceAttempts: isMultiDeviceMismatch ? 1 : (profileData.failedDeviceAttempts || 0)
-            };
-            setUserProfile(blockedProfile);
-
-            if (isMultiDeviceMismatch) {
-              updateDoc(userDocRef, {
-                status: 'blocked',
-                blockedReason: 'multi_device',
-                failedDeviceAttempts: 1,
-                lastAttemptDeviceId: currentDeviceId,
-                updatedAt: new Date().toISOString()
-              }).catch((err) => console.error('Error auto-blocking multi-device user:', err));
-
-              sendTelegramSecurityBlockAlert(
-                telegramConfig,
-                currentUser.email || 'No email',
-                profileData.displayName || currentUser.displayName || 'Google User',
-                currentUser.uid
-              ).catch((err) => console.error('Error sending auto-block Telegram security alert:', err));
-            }
-          } else {
-            // Active paid user on verified device
-            localStorage.setItem('userStatus', 'active');
-            setUserProfile(profileData);
-            if (!profileData.activeDeviceId) {
-              updateDoc(userDocRef, {
-                activeDeviceId: currentDeviceId,
-                registeredDeviceId: currentDeviceId,
-                updatedAt: new Date().toISOString()
-              }).catch((err) => console.error('Error auto-registering device for unblocked user:', err));
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching Firestore user document:', err);
-        const cachedUserStatusErr = localStorage.getItem('userStatus');
-        const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-
-        if ((cachedUserStatusErr === 'active' || savedOfflineAuth?.status === 'active') && savedOfflineAuth?.uid === currentUser.uid) {
-          setUserProfile({
-            uid: currentUser.uid,
-            email: currentUser.email || 'Google User',
-            displayName: currentUser.displayName || 'Google User',
-            status: 'active',
-            activeDeviceId: currentDeviceId,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        } else {
-          setUserProfile((prev) => prev || {
-            uid: currentUser.uid,
-            email: currentUser.email || 'No Email',
-            displayName: currentUser.displayName || 'Google User',
-            photoURL: currentUser.photoURL || undefined,
-            status: 'pending',
-            failedDeviceAttempts: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        }
-      } finally {
-        setAuthLoading(false);
-        setIsVerifyingPayment(false);
-      }
-
-      // Real-time snapshot listener on user document
-      const unsubscribeProfile = onSnapshot(userDocRef, (snap) => {
-        if (snap.exists()) {
-          const profileData = snap.data() as UserProfile;
-          const isMultiDeviceMismatch = profileData.activeDeviceId && profileData.activeDeviceId !== currentDeviceId;
-
-          if (profileData.status !== 'active' || isMultiDeviceMismatch) {
-            localStorage.removeItem('userStatus');
-            localStorage.removeItem(OFFLINE_AUTH_KEY);
-
-            setUserProfile({
-              ...profileData,
-              status: isMultiDeviceMismatch ? 'blocked' : profileData.status,
-              blockedReason: isMultiDeviceMismatch ? 'multi_device' : profileData.blockedReason,
-              failedDeviceAttempts: isMultiDeviceMismatch ? 1 : (profileData.failedDeviceAttempts || 0)
-            });
-
-            if (isMultiDeviceMismatch) {
-              updateDoc(userDocRef, {
-                status: 'blocked',
-                blockedReason: 'multi_device',
-                failedDeviceAttempts: 1,
-                lastAttemptDeviceId: currentDeviceId,
-                updatedAt: new Date().toISOString()
-              }).catch((e) => console.error('Error auto-blocking in snapshot:', e));
-            }
-          } else {
-            localStorage.setItem('userStatus', 'active');
-            setUserProfile(profileData);
-            if (!profileData.activeDeviceId) {
-              updateDoc(userDocRef, {
-                activeDeviceId: currentDeviceId,
-                registeredDeviceId: currentDeviceId,
-                updatedAt: new Date().toISOString()
-              }).catch((e) => console.error('Error auto-registering device in snapshot:', e));
-            }
-
-            const offlinePayload = {
-              uid: currentUser.uid,
-              email: currentUser.email || 'Google User',
-              displayName: profileData.displayName || currentUser.displayName || 'Google User',
-              photoURL: profileData.photoURL || currentUser.photoURL,
-              status: 'active',
-              activeDeviceId: profileData.activeDeviceId || currentDeviceId,
-              token: `nexus_tok_${currentUser.uid}_${Date.now()}`,
-              updatedAt: new Date().toISOString()
-            };
-            try {
-              localStorage.setItem(OFFLINE_AUTH_KEY, encodeAuthPayload(offlinePayload));
-            } catch (_) {}
-          }
-        } else {
-          const fallbackProfile: UserProfile = {
-            uid: currentUser.uid,
-            email: currentUser.email || 'No Email',
-            displayName: currentUser.displayName || 'Google User',
-            photoURL: currentUser.photoURL || undefined,
-            status: 'pending',
-            failedDeviceAttempts: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          setUserProfile(fallbackProfile);
-          localStorage.removeItem('userStatus');
-          setDoc(userDocRef, fallbackProfile).catch((e) => console.error('Error initializing fallback profile doc:', e));
-        }
-        setAuthLoading(false);
-        setIsVerifyingPayment(false);
-      }, (err) => {
-        console.error('Error subscribing to user profile:', err);
-        setAuthLoading(false);
-        setIsVerifyingPayment(false);
-      });
-
-      return () => unsubscribeProfile();
-    });
-
-    return () => unsubscribeAuth();
-  }, []);
-
-  // 2.5-Second Safety Timeout Guard: Forces resolution of loading screen within 2.5s maximum
-  useEffect(() => {
-    if (!authLoading && !isVerifyingPayment) return;
-
-    const timer = setTimeout(() => {
-      console.warn('2.5-Second Safety Timeout Triggered. Forcing resolution of loading state.');
-
-      const cachedUserStatus = localStorage.getItem('userStatus');
-      const savedOfflineAuth = decodeAuthPayload<any>(localStorage.getItem(OFFLINE_AUTH_KEY));
-
-      if ((cachedUserStatus === 'active' || savedOfflineAuth?.status === 'active') && user) {
-        setUserProfile((prev) => prev || {
-          uid: user.uid,
-          email: user.email || 'Google User',
-          displayName: user.displayName || 'Google User',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-      } else if (user && !userProfile) {
-        setUserProfile({
-          uid: user.uid,
-          email: user.email || 'No Email',
-          displayName: user.displayName || 'Google User',
-          photoURL: user.photoURL || undefined,
-          status: 'pending',
-          failedDeviceAttempts: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-      }
-
-      setAuthLoading(false);
-      setIsVerifyingPayment(false);
-    }, 2500);
-
-    return () => clearTimeout(timer);
-  }, [authLoading, isVerifyingPayment, user, userProfile]);
-
-
-  // Persistent state synchronization to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('calcs_history_ledger', JSON.stringify(history));
-    } catch (e) {
-      // ignore
-    }
-  }, [history]);
-
-  const [currentTime, setCurrentTime] = useState<string>('00:00');
-  
-  // Feedback States - default enabled for tactile rich experience
   const [isHapticEnabled, setIsHapticEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('nexus_is_haptic_enabled');
@@ -599,6 +63,235 @@ export default function App() {
     }
   });
 
+  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_is_premium_unlocked');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (_) {
+      return true;
+    }
+  });
+
+  const [isZoomLocked, setIsZoomLocked] = useState<boolean>(false);
+
+  // 2. Standard Tab State (Persisted in localStorage)
+  const [standardExpression, setStandardExpression] = useState<string>(() => {
+    try {
+      return localStorage.getItem('nexus_standard_expression') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+
+  const [standardLiveResult, setStandardLiveResult] = useState<string>(() => {
+    try {
+      return localStorage.getItem('nexus_standard_live_result') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+
+  const [standardHistoryExpression, setStandardHistoryExpression] = useState<string>(() => {
+    try {
+      return localStorage.getItem('nexus_standard_history_expression') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+
+  const [standardIsDeg, setStandardIsDeg] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_standard_is_deg');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (_) {
+      return true;
+    }
+  });
+
+  const [standardParsingError, setStandardParsingError] = useState<string | null>(null);
+
+  // 3. Matrices Tab State (Persisted in localStorage)
+  const [matricesRowsA, setMatricesRowsA] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_rows_a');
+      return saved ? parseInt(saved, 10) : 3;
+    } catch (_) {
+      return 3;
+    }
+  });
+
+  const [matricesColsA, setMatricesColsA] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_cols_a');
+      return saved ? parseInt(saved, 10) : 3;
+    } catch (_) {
+      return 3;
+    }
+  });
+
+  const [matricesRowsB, setMatricesRowsB] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_rows_b');
+      return saved ? parseInt(saved, 10) : 3;
+    } catch (_) {
+      return 3;
+    }
+  });
+
+  const [matricesColsB, setMatricesColsB] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_cols_b');
+      return saved ? parseInt(saved, 10) : 3;
+    } catch (_) {
+      return 3;
+    }
+  });
+
+  const [matricesMatrixA, setMatricesMatrixA] = useState<(number | string)[][]>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_matrix_a');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return Array(10).fill(0).map(() => Array(10).fill(''));
+  });
+
+  const [matricesMatrixB, setMatricesMatrixB] = useState<(number | string)[][]>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_matrices_matrix_b');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return Array(10).fill(0).map(() => Array(10).fill(''));
+  });
+
+  const [matricesResultMatrix, setMatricesResultMatrix] = useState<number[][] | null>(null);
+  const [matricesResultScalar, setMatricesResultScalar] = useState<number | null>(null);
+  const [matricesOpLabel, setMatricesOpLabel] = useState<string>('');
+  const [matricesErrorText, setMatricesErrorText] = useState<string | null>(null);
+  const [matricesScalarK, setMatricesScalarK] = useState<string>('');
+
+  // 4. Centroids Tab State (Persisted in localStorage)
+  const [centroidsShape, setCentroidsShape] = useState<CentroidShape>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_centroids_shape');
+      return (saved as CentroidShape) || 'Rectangle';
+    } catch (_) {
+      return 'Rectangle';
+    }
+  });
+
+  const [centroidsWidth, setCentroidsWidth] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_centroids_width');
+      return saved !== null ? saved : 10;
+    } catch (_) {
+      return 10;
+    }
+  });
+
+  const [centroidsHeight, setCentroidsHeight] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_centroids_height');
+      return saved !== null ? saved : 10;
+    } catch (_) {
+      return 10;
+    }
+  });
+
+  const [centroidsRadius, setCentroidsRadius] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_centroids_radius');
+      return saved !== null ? saved : 5;
+    } catch (_) {
+      return 5;
+    }
+  });
+
+  const [centroidsDegree, setCentroidsDegree] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_centroids_degree');
+      return saved ? parseInt(saved, 10) : 2;
+    } catch (_) {
+      return 2;
+    }
+  });
+
+  const [centroidsArea, setCentroidsArea] = useState<number>(100);
+  const [centroidsXBar, setCentroidsXBar] = useState<number>(5);
+  const [centroidsYBar, setCentroidsYBar] = useState<number>(5);
+
+  // 5. MOI Tab State (Persisted in localStorage)
+  const [moiShape, setMoiShape] = useState<CentroidShape>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_moi_shape');
+      return (saved as CentroidShape) || 'Rectangle';
+    } catch (_) {
+      return 'Rectangle';
+    }
+  });
+
+  const [moiWidth, setMoiWidth] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_moi_width');
+      return saved !== null ? saved : 10;
+    } catch (_) {
+      return 10;
+    }
+  });
+
+  const [moiHeight, setMoiHeight] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_moi_height');
+      return saved !== null ? saved : 10;
+    } catch (_) {
+      return 10;
+    }
+  });
+
+  const [moiRadius, setMoiRadius] = useState<number | string>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_moi_radius');
+      return saved !== null ? saved : 5;
+    } catch (_) {
+      return 5;
+    }
+  });
+
+  const [moiDegree, setMoiDegree] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_moi_degree');
+      return saved ? parseInt(saved, 10) : 2;
+    } catch (_) {
+      return 2;
+    }
+  });
+
+  const [moiIx, setMoiIx] = useState<number>(0);
+  const [moiIy, setMoiIy] = useState<number>(0);
+  const [moiRx, setMoiRx] = useState<number>(0);
+  const [moiRy, setMoiRy] = useState<number>(0);
+
+  // --------------------------------------------------------------------------
+  // LOCAL STORAGE PERSISTENCE SYNCHRONIZATION
+  // --------------------------------------------------------------------------
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_active_tab', activeTab);
+    } catch (_) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_is_dark_mode', JSON.stringify(isDarkMode));
+    } catch (_) {}
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('calcs_history_ledger', JSON.stringify(history));
+    } catch (_) {}
+  }, [history]);
+
   useEffect(() => {
     try {
       localStorage.setItem('nexus_is_haptic_enabled', JSON.stringify(isHapticEnabled));
@@ -610,92 +303,69 @@ export default function App() {
       localStorage.setItem('nexus_is_audio_enabled', JSON.stringify(isAudioEnabled));
     } catch (_) {}
   }, [isAudioEnabled]);
-  const [isZoomLocked, setIsZoomLocked] = useState<boolean>(false);
 
-  // Standard Tab State
-  const [standardExpression, setStandardExpression] = useState<string>(() => {
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('nexus_standard_expression');
-      return saved || '';
-    } catch (_) {
-      return '';
-    }
-  });
-  const [standardLiveResult, setStandardLiveResult] = useState<string>(() => {
+      localStorage.setItem('nexus_is_premium_unlocked', JSON.stringify(isPremiumUnlocked));
+    } catch (_) {}
+  }, [isPremiumUnlocked]);
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('nexus_standard_live_result');
-      return saved || '';
-    } catch (_) {
-      return '';
-    }
-  });
-  const [standardHistoryExpression, setStandardHistoryExpression] = useState<string>(() => {
+      localStorage.setItem('nexus_standard_expression', standardExpression);
+    } catch (_) {}
+  }, [standardExpression]);
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('nexus_standard_history_expression');
-      return saved || '';
-    } catch (_) {
-      return '';
-    }
-  });
-  const [standardIsDeg, setStandardIsDeg] = useState<boolean>(() => {
+      localStorage.setItem('nexus_standard_live_result', standardLiveResult);
+    } catch (_) {}
+  }, [standardLiveResult]);
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('nexus_standard_is_deg');
-      return saved ? JSON.parse(saved) : true;
-    } catch (_) {
-      return true;
-    }
-  });
-  const [standardParsingError, setStandardParsingError] = useState<string | null>(() => {
+      localStorage.setItem('nexus_standard_history_expression', standardHistoryExpression);
+    } catch (_) {}
+  }, [standardHistoryExpression]);
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('nexus_standard_parsing_error');
-      return saved || null;
-    } catch (_) {
-      return null;
-    }
-  });
+      localStorage.setItem('nexus_standard_is_deg', JSON.stringify(standardIsDeg));
+    } catch (_) {}
+  }, [standardIsDeg]);
 
-  // Matrices Tab State
-  const [matricesRowsA, setMatricesRowsA] = useState<number>(3);
-  const [matricesColsA, setMatricesColsA] = useState<number>(3);
-  const [matricesRowsB, setMatricesRowsB] = useState<number>(3);
-  const [matricesColsB, setMatricesColsB] = useState<number>(3);
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_matrices_rows_a', matricesRowsA.toString());
+      localStorage.setItem('nexus_matrices_cols_a', matricesColsA.toString());
+      localStorage.setItem('nexus_matrices_rows_b', matricesRowsB.toString());
+      localStorage.setItem('nexus_matrices_cols_b', matricesColsB.toString());
+      localStorage.setItem('nexus_matrices_matrix_a', JSON.stringify(matricesMatrixA));
+      localStorage.setItem('nexus_matrices_matrix_b', JSON.stringify(matricesMatrixB));
+    } catch (_) {}
+  }, [matricesRowsA, matricesColsA, matricesRowsB, matricesColsB, matricesMatrixA, matricesMatrixB]);
 
-  const [matricesMatrixA, setMatricesMatrixA] = useState<(number | string)[][]>(() => 
-    Array(10).fill(0).map(() => Array(10).fill(''))
-  );
-  
-  const [matricesMatrixB, setMatricesMatrixB] = useState<(number | string)[][]>(() => 
-    Array(10).fill(0).map(() => Array(10).fill(''))
-  );
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_centroids_shape', centroidsShape);
+      localStorage.setItem('nexus_centroids_width', centroidsWidth.toString());
+      localStorage.setItem('nexus_centroids_height', centroidsHeight.toString());
+      localStorage.setItem('nexus_centroids_radius', centroidsRadius.toString());
+      localStorage.setItem('nexus_centroids_degree', centroidsDegree.toString());
+    } catch (_) {}
+  }, [centroidsShape, centroidsWidth, centroidsHeight, centroidsRadius, centroidsDegree]);
 
-  const [matricesResultMatrix, setMatricesResultMatrix] = useState<number[][] | null>(null);
-  const [matricesResultScalar, setMatricesResultScalar] = useState<number | null>(null);
-  const [matricesOpLabel, setMatricesOpLabel] = useState<string>('');
-  const [matricesErrorText, setMatricesErrorText] = useState<string | null>(null);
-  const [matricesScalarK, setMatricesScalarK] = useState<string>('');
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_moi_shape', moiShape);
+      localStorage.setItem('nexus_moi_width', moiWidth.toString());
+      localStorage.setItem('nexus_moi_height', moiHeight.toString());
+      localStorage.setItem('nexus_moi_radius', moiRadius.toString());
+      localStorage.setItem('nexus_moi_degree', moiDegree.toString());
+    } catch (_) {}
+  }, [moiShape, moiWidth, moiHeight, moiRadius, moiDegree]);
 
-  // Centroids Tab State
-  const [centroidsShape, setCentroidsShape] = useState<CentroidShape>('Rectangle');
-  const [centroidsWidth, setCentroidsWidth] = useState<number | string>(10);
-  const [centroidsHeight, setCentroidsHeight] = useState<number | string>(10);
-  const [centroidsRadius, setCentroidsRadius] = useState<number | string>(5);
-  const [centroidsDegree, setCentroidsDegree] = useState<number>(2);
-  const [centroidsArea, setCentroidsArea] = useState<number>(100);
-  const [centroidsXBar, setCentroidsXBar] = useState<number>(5);
-  const [centroidsYBar, setCentroidsYBar] = useState<number>(5);
-
-  // MOI Tab State
-  const [moiShape, setMoiShape] = useState<CentroidShape>('Rectangle');
-  const [moiWidth, setMoiWidth] = useState<number | string>(10);
-  const [moiHeight, setMoiHeight] = useState<number | string>(10);
-  const [moiRadius, setMoiRadius] = useState<number | string>(5);
-  const [moiDegree, setMoiDegree] = useState<number>(2);
-  const [moiIx, setMoiIx] = useState<number>(0);
-  const [moiIy, setMoiIy] = useState<number>(0);
-  const [moiRx, setMoiRx] = useState<number>(0);
-  const [moiRy, setMoiRy] = useState<number>(0);
-
-  // Tab switch listener
+  // Tab switch cleanup
   useEffect(() => {
     setMatricesErrorText(null);
     setStandardParsingError(null);
@@ -707,27 +377,12 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Real-time clock update for simulated status bar
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      let hours = now.getHours().toString();
-      let minutes = now.getMinutes().toString();
-      if (hours.length === 1) hours = '0' + hours;
-      if (minutes.length === 1) minutes = '0' + minutes;
-      setCurrentTime(`${hours}:${minutes}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000 * 60);
-    return () => clearInterval(interval);
-  }, []);
-
   const triggerFeedback = () => {
     if (isAudioEnabled) playMechanicalClick();
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator && isHapticEnabled) {
       try {
         navigator.vibrate(15);
-      } catch (e) {}
+      } catch (_) {}
     }
   };
 
@@ -764,7 +419,7 @@ export default function App() {
   };
 
   const handleRestoreHistoryItem = (item: HistoryItem) => {
-    if (triggerFeedback) triggerFeedback();
+    triggerFeedback();
 
     if (item.type === 'Standard') {
       const cleanExpression = item.expression.replace(/\s*\[DEG\]/gi, '').replace(/\s*\[RAD\]/gi, '').trim();
@@ -896,7 +551,7 @@ export default function App() {
             setErrorText={setMatricesErrorText}
             scalarK={matricesScalarK}
             setScalarK={setMatricesScalarK}
-            isPremiumUnlocked={true}
+            isPremiumUnlocked={isPremiumUnlocked}
           />
         );
       case 'Centroids':
@@ -959,7 +614,7 @@ export default function App() {
             isDarkMode={isDarkMode} 
             triggerFeedback={triggerFeedback}
             onRestoreItem={handleRestoreHistoryItem}
-            isPremiumUnlocked={true}
+            isPremiumUnlocked={isPremiumUnlocked}
           />
         );
       case 'Settings':
@@ -971,8 +626,8 @@ export default function App() {
             onToggleHaptic={() => setIsHapticEnabled(p => !p)}
             isAudioEnabled={isAudioEnabled}
             onToggleAudio={() => setIsAudioEnabled(p => !p)}
-            isPremiumUnlocked={true}
-            onTogglePremium={() => {}}
+            isPremiumUnlocked={isPremiumUnlocked}
+            onTogglePremium={() => setIsPremiumUnlocked(p => !p)}
           />
         );
       default:
@@ -980,101 +635,39 @@ export default function App() {
     }
   };
 
-  // --------------------------------------------------------------------------
-  // AUTHENTICATION & ACCESS GATING CONTROLLER
-  // --------------------------------------------------------------------------
-
-  // 1. Loading State (Auth or Payment Status Verification)
-  if (authLoading || isVerifyingPayment) {
-    return (
-      <div className={`min-h-screen w-full flex flex-col items-center justify-center p-4 select-none ${
-        isDarkMode ? 'bg-neutral-950 text-white' : 'bg-slate-50 text-slate-900'
-      }`}>
-        <div className="flex flex-col items-center space-y-4">
-          <RefreshCw className="w-10 h-10 animate-spin text-cyan-400" />
-          <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-            Verifying Payment & System Credentials...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Unauthenticated User Wall -> Render Exclusive Google Sign-In Interface
-  if (!user) {
-    return <GoogleSignInView isDarkMode={isDarkMode} />;
-  }
-
-  // 3. Strict Administrator Email Gate -> Option to render Owner Dashboard
-  if (user.email === 'yousifir431@gmail.com' && showOwnerDashboard) {
-    return (
-      <OwnerDashboardView 
-        user={user} 
-        isDarkMode={isDarkMode} 
-        onCloseDashboard={() => setShowOwnerDashboard(false)} 
-      />
-    );
-  }
-
-  // 4. Verification & Security Status Gate for Authenticated Users
-  const userStatus = userProfile?.status || 'pending';
-  const failedAttempts = userProfile?.failedDeviceAttempts || 0;
-
-  // Render Full Unlocked App inside ProtectedRouteGuard
+  // Immediate direct render of the entire standalone application
   return (
-    <ProtectedRouteGuard
-      user={user}
-      userStatus={userStatus}
-      failedAttempts={failedAttempts}
-      userProfile={userProfile}
-      telegramConfig={telegramConfig}
-      isDarkMode={isDarkMode}
-    >
-      <div className={`min-h-screen h-[100dvh] max-h-[100dvh] w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans overflow-hidden overflow-y-hidden ${
-        isDarkMode ? 'bg-zinc-950 text-neutral-100' : 'bg-slate-50 text-slate-800'
-      }`}>
-        
-        {/* Visual Ambient Background Blobs */}
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
+    <div className={`min-h-screen h-[100dvh] max-h-[100dvh] w-full flex items-center justify-center p-0 md:p-6 transition-colors duration-250 font-sans overflow-hidden overflow-y-hidden ${
+      isDarkMode ? 'bg-zinc-950 text-neutral-100' : 'bg-slate-50 text-slate-800'
+    }`}>
+      
+      {/* Visual Ambient Background Blobs on Desktop */}
+      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -z-50 pointer-events-none hidden md:block" />
 
-        {/* Primary Phone Container */}
+      {/* Primary Calculator Frame Container */}
+      <div 
+        id="phone-frame-container" 
+        className={`w-full h-screen h-[100dvh] max-h-[100dvh] md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden overflow-y-hidden shadow-2xl relative border transition-all duration-250 ${
+          isDarkMode 
+            ? 'bg-zinc-950 border-neutral-800/80 shadow-black' 
+            : 'bg-white border-slate-200 shadow-slate-300'
+        }`}
+      >
+        {/* Inner Viewport Screen */}
+        <div className="flex-1 w-full max-w-full overflow-hidden overflow-y-hidden min-h-0 p-0 md:p-3.5 pb-0 flex flex-col justify-between">
+          {renderActiveScreen()}
+        </div>
+
+        {/* Bottom Navigation Bar */}
         <div 
-          id="phone-frame-container" 
-          className={`w-full h-screen h-[100dvh] max-h-[100dvh] md:h-[660px] md:w-[350px] md:max-w-[350px] md:rounded-[36px] flex flex-col justify-between overflow-hidden overflow-y-hidden shadow-2xl relative border transition-all duration-250 md:aspect-[9/18a] ${
+          id="bottom-tab-navigation"
+          className={`h-14 border-t flex justify-around items-center shrink-0 z-10 px-0.5 select-none ${
             isDarkMode 
-              ? 'bg-zinc-950 border-neutral-800/80 shadow-black' 
-              : 'bg-white border-slate-200 shadow-slate-300'
+              ? 'bg-neutral-950 border-neutral-800 text-neutral-400' 
+              : 'bg-slate-50 border-slate-200 text-slate-500'
           }`}
         >
-          {/* Admin floating button for administrator */}
-          {user.email === 'yousifir431@gmail.com' && (
-            <div className="absolute top-2 right-2 z-50">
-              <button
-                onClick={() => setShowOwnerDashboard(true)}
-                className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-md hover:bg-cyan-500/30 transition-all"
-                title="Open Owner Control Center"
-              >
-                <ShieldCheck size={12} />
-                <span>Admin</span>
-              </button>
-            </div>
-          )}
-
-          {/* Inner Viewport Screen */}
-          <div className="flex-1 w-full max-w-full overflow-hidden overflow-y-hidden min-h-0 p-0 md:p-3.5 pb-0 flex flex-col justify-between">
-            {renderActiveScreen()}
-          </div>
-
-          {/* Bottom Navigation Bar */}
-          <div 
-            id="bottom-tab-navigation"
-            className={`h-14 border-t flex justify-around items-center shrink-0 z-10 px-0.5 select-none ${
-              isDarkMode 
-                ? 'bg-neutral-950 border-neutral-800 text-neutral-400' 
-                : 'bg-slate-50 border-slate-200 text-slate-500'
-            }`}
-          >
           {/* Standard */}
           <button
             id="tab-btn-standard"
@@ -1160,13 +753,12 @@ export default function App() {
           </button>
         </div>
 
-        {/* Home indicator bar */}
+        {/* Home indicator bar on desktop */}
         <div className="h-4 w-full flex justify-center items-center pb-2 shrink-0 select-none hidden md:flex">
           <div className="w-24 h-1 bg-neutral-600/60 rounded-full" />
         </div>
 
       </div>
     </div>
-    </ProtectedRouteGuard>
   );
 }
